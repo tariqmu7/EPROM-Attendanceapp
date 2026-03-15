@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.authorUid;
+    }
+    function uidUnchanged() {
+      return !('authorUid' in request.resource.data) || request.resource.data.authorUid == request.auth.uid;
+    }
+    function uidNotModified() {
+      return !('authorUid' in request.resource.data) || request.resource.data.authorUid == resource.data.authorUid;
+    }
+    function isValidLog(data) {
+      return data.keys().hasAll(['name', 'timestamp', 'authorUid']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.timestamp is number &&
+             data.authorUid is string &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() < 50)) &&
+             (!('company' in data) || (data.company is string && data.company.size() < 100)) &&
+             (!('title' in data) || (data.title is string && data.title.size() < 100)) &&
+             (!('reason' in data) || (data.reason is string && data.reason.size() < 500));
+    }
+
+    match /attendanceLogs/{logId} {
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.authorUid;
+      allow create: if isAuthenticated() && isValidLog(request.resource.data) && uidUnchanged();
+      allow update: if isOwner() && isValidLog(request.resource.data) && uidNotModified();
+      allow delete: if isOwner();
+    }
+  }
+}

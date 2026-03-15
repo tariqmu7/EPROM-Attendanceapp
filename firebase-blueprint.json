@@ -1,0 +1,25 @@
+{
+  "entities": {
+    "AttendanceLog": {
+      "title": "Attendance Log",
+      "description": "A record of an attendee's visit.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "company": { "type": "string" },
+        "title": { "type": "string" },
+        "reason": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "authorUid": { "type": "string" }
+      },
+      "required": ["name", "timestamp", "authorUid"]
+    }
+  },
+  "firestore": {
+    "attendanceLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AttendanceLog" },
+      "description": "Stores all attendance logs."
+    }
+  }
+}

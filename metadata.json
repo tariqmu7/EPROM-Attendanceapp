@@ -1,0 +1,5 @@
+{
+  "name": "EPROM Attendance",
+  "description": "Smart attendance logging system for EPROM with voice and business card scanning.",
+  "requestFramePermissions": ["camera", "microphone"]
+}
