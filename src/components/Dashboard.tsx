@@ -3,7 +3,7 @@ import { collection, onSnapshot, query, where, doc, deleteDoc } from 'firebase/f
 import { db, auth } from '../firebase';
 import * as XLSX from 'xlsx';
 import { Download, WifiOff, CheckCircle2, Clock, Edit2, Trash2 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../utils/errorHandler';
 import { AttendanceRecord } from '../App';
 import { toast } from 'react-toastify';
@@ -161,71 +161,80 @@ export default function Dashboard({ onEdit }: DashboardProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {logs.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="p-8 text-center text-slate-500">
-                  No attendance logs found.
-                </td>
-              </tr>
-            ) : (
-              logs.map((log, i) => (
+            <AnimatePresence mode="popLayout">
+              {logs.length === 0 ? (
                 <motion.tr 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  key={log.id || i} 
-                  className="hover:bg-slate-50 transition-colors group"
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
                 >
-                  <td className="p-5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-bold">
-                        {log.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="font-bold text-slate-800">{log.name}</div>
-                          {log.synced === 0 && (
-                            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-black rounded-full uppercase tracking-wider">
-                              Offline
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-sm text-slate-500">{log.phone}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-5">
-                    <div className="font-semibold text-slate-700">{log.company || '-'}</div>
-                    <div className="text-sm text-slate-500">{log.title}</div>
-                  </td>
-                  <td className="p-5 text-slate-600 max-w-xs truncate italic">
-                    "{log.reason || '-'}"
-                  </td>
-                  <td className="p-5 text-sm text-slate-500 whitespace-nowrap">
-                    <div className="font-medium text-slate-700">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                    <div className="text-xs text-slate-400">{new Date(log.timestamp).toLocaleDateString()}</div>
-                  </td>
-                  <td className="p-5 text-right">
-                    <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
-                      <button 
-                        onClick={() => onEdit(log)}
-                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
-                        title="Edit Log"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(log)}
-                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                        title="Delete Log"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                  <td colSpan={5} className="p-8 text-center text-slate-500">
+                    No attendance logs found.
                   </td>
                 </motion.tr>
-              ))
-            )}
+              ) : (
+                logs.map((log, i) => (
+                  <motion.tr 
+                    layout
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -20, transition: { duration: 0.2 } }}
+                    transition={{ delay: i * 0.05 }}
+                    key={log.id || i} 
+                    className="hover:bg-slate-50 transition-colors group"
+                  >
+                    <td className="p-5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-bold">
+                          {log.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <div className="font-bold text-slate-800">{log.name}</div>
+                            {log.synced === 0 && (
+                              <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-black rounded-full uppercase tracking-wider">
+                                Offline
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-slate-500">{log.phone}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-5">
+                      <div className="font-semibold text-slate-700">{log.company || '-'}</div>
+                      <div className="text-sm text-slate-500">{log.title}</div>
+                    </td>
+                    <td className="p-5 text-slate-600 max-w-xs truncate italic">
+                      "{log.reason || '-'}"
+                    </td>
+                    <td className="p-5 text-sm text-slate-500 whitespace-nowrap">
+                      <div className="font-medium text-slate-700">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                      <div className="text-xs text-slate-400">{new Date(log.timestamp).toLocaleDateString()}</div>
+                    </td>
+                    <td className="p-5 text-right">
+                      <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
+                        <button 
+                          onClick={() => onEdit(log)}
+                          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                          title="Edit Log"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(log)}
+                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                          title="Delete Log"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </motion.tr>
+                ))
+              )}
+            </AnimatePresence>
           </tbody>
         </table>
       </div>

@@ -53,7 +53,7 @@ export async function transcribeAndExtract(audioData: { base64: string, mimeType
 
 export async function analyzeBusinessCard(imageBase64: string, mimeType: string): Promise<ExtractedData> {
   const response = await ai.models.generateContent({
-    model: "gemini-3.1-pro-preview",
+    model: "gemini-3-flash-preview",
     contents: {
       parts: [
         {
@@ -70,7 +70,7 @@ export async function analyzeBusinessCard(imageBase64: string, mimeType: string)
     config: {
       responseMimeType: "application/json",
       responseSchema: dataSchema,
-      thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH }
+      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
     },
   });
 
