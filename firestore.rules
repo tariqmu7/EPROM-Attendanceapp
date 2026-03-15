@@ -27,11 +27,26 @@ service cloud.firestore {
              (!('reason' in data) || (data.reason is string && data.reason.size() < 500));
     }
 
+    function isValidScheduleItem(data) {
+      return data.keys().hasAll(['day', 'startTime', 'endTime', 'title', 'speaker', 'subject']) &&
+             data.day is number && data.day >= 1 && data.day <= 3 &&
+             data.startTime is string && data.startTime.size() > 0 &&
+             data.endTime is string && data.endTime.size() > 0 &&
+             data.title is string && data.title.size() > 0 &&
+             data.speaker is string && data.speaker.size() > 0 &&
+             data.subject is string && data.subject.size() > 0;
+    }
+
     match /attendanceLogs/{logId} {
       allow read: if isAuthenticated() && request.auth.uid == resource.data.authorUid;
       allow create: if isAuthenticated() && isValidLog(request.resource.data) && uidUnchanged();
       allow update: if isOwner() && isValidLog(request.resource.data) && uidNotModified();
       allow delete: if isOwner();
+    }
+
+    match /schedule/{itemId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidScheduleItem(request.resource.data);
     }
   }
 }

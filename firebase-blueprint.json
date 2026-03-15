@@ -14,12 +14,30 @@
         "authorUid": { "type": "string" }
       },
       "required": ["name", "timestamp", "authorUid"]
+    },
+    "ScheduleItem": {
+      "title": "Schedule Item",
+      "description": "A scheduled session at the booth.",
+      "type": "object",
+      "properties": {
+        "day": { "type": "number" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "title": { "type": "string" },
+        "speaker": { "type": "string" },
+        "subject": { "type": "string" }
+      },
+      "required": ["day", "startTime", "endTime", "title", "speaker", "subject"]
     }
   },
   "firestore": {
     "attendanceLogs/{logId}": {
       "schema": { "$ref": "#/entities/AttendanceLog" },
       "description": "Stores all attendance logs."
+    },
+    "schedule/{itemId}": {
+      "schema": { "$ref": "#/entities/ScheduleItem" },
+      "description": "Stores the booth activity schedule."
     }
   }
 }

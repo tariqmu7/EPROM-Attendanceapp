@@ -130,29 +130,34 @@ export default function Dashboard({ onEdit }: DashboardProps) {
         </motion.div>
       </div>
 
-      <div className="p-6 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-800">Recent Logs</h2>
-          <p className="text-sm text-slate-500 mt-1">Manage and export your attendance records</p>
+      <div className="p-8 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 bg-slate-50/50">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-100">
+            <CheckCircle2 className="w-6 h-6" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">Visitor Log</h2>
+            <p className="text-sm text-slate-500 mt-0.5">Real-time attendance monitoring</p>
+          </div>
         </div>
         <button 
           onClick={exportToExcel}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg font-medium transition-colors"
+          className="flex items-center gap-2 px-6 py-3 bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50 rounded-xl font-bold transition-all shadow-sm hover:shadow-md active:scale-95"
         >
-          <Download className="w-4 h-4" />
-          Export Excel
+          <Download className="w-5 h-5" />
+          Export to Excel
         </button>
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-slate-50 text-slate-500 text-sm uppercase tracking-wider">
-              <th className="p-4 font-medium">Name</th>
-              <th className="p-4 font-medium">Company & Title</th>
-              <th className="p-4 font-medium">Reason</th>
-              <th className="p-4 font-medium">Time</th>
-              <th className="p-4 font-medium text-right">Actions</th>
+            <tr className="bg-slate-50/50 text-slate-400 text-xs uppercase tracking-[0.2em] font-black">
+              <th className="p-5">Visitor</th>
+              <th className="p-5">Affiliation</th>
+              <th className="p-5">Purpose</th>
+              <th className="p-5">Timestamp</th>
+              <th className="p-5 text-right">Manage</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -171,40 +176,47 @@ export default function Dashboard({ onEdit }: DashboardProps) {
                   key={log.id || i} 
                   className="hover:bg-slate-50 transition-colors group"
                 >
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <div className="font-medium text-slate-800">{log.name}</div>
-                      {log.synced === 0 && (
-                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded uppercase tracking-tighter">
-                          Offline
-                        </span>
-                      )}
+                  <td className="p-5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-bold">
+                        {log.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="font-bold text-slate-800">{log.name}</div>
+                          {log.synced === 0 && (
+                            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-black rounded-full uppercase tracking-wider">
+                              Offline
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm text-slate-500">{log.phone}</div>
+                      </div>
                     </div>
-                    <div className="text-sm text-slate-500">{log.phone}</div>
                   </td>
-                  <td className="p-4">
-                    <div className="text-slate-800">{log.company || '-'}</div>
+                  <td className="p-5">
+                    <div className="font-semibold text-slate-700">{log.company || '-'}</div>
                     <div className="text-sm text-slate-500">{log.title}</div>
                   </td>
-                  <td className="p-4 text-slate-600 max-w-xs truncate">
-                    {log.reason || '-'}
+                  <td className="p-5 text-slate-600 max-w-xs truncate italic">
+                    "{log.reason || '-'}"
                   </td>
-                  <td className="p-4 text-sm text-slate-500 whitespace-nowrap">
-                    {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  <td className="p-5 text-sm text-slate-500 whitespace-nowrap">
+                    <div className="font-medium text-slate-700">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                     <div className="text-xs text-slate-400">{new Date(log.timestamp).toLocaleDateString()}</div>
                   </td>
-                  <td className="p-4 text-right">
-                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <td className="p-5 text-right">
+                    <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
                       <button 
                         onClick={() => onEdit(log)}
-                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
                         title="Edit Log"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button 
                         onClick={() => handleDelete(log)}
-                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
                         title="Delete Log"
                       >
                         <Trash2 className="w-4 h-4" />

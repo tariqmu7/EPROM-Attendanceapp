@@ -19,6 +19,9 @@ const STEPS = [
 export default function VoiceLogger({ onExtracted, onCancel }: VoiceLoggerProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isCalibrating, setIsCalibrating] = useState(false);
+  const [isCalibrated, setIsCalibrated] = useState(false);
+  const [calibrationProgress, setCalibrationProgress] = useState(0);
   const [processingProgress, setProcessingProgress] = useState(0);
   const [volumeLevel, setVolumeLevel] = useState(0);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -33,6 +36,7 @@ export default function VoiceLogger({ onExtracted, onCancel }: VoiceLoggerProps)
 
   // Silence detection & noise gate refs
   const isRecordingRef = useRef(false);
+  const isCalibratingRef = useRef(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -42,6 +46,77 @@ export default function VoiceLogger({ onExtracted, onCancel }: VoiceLoggerProps)
   const calibrationSamplesRef = useRef<number[]>([]);
   
   const startRecordingRef = useRef<() => Promise<void>>(async () => {});
+
+  const runCalibration = async () => {
+    try {
+      setIsCalibrating(true);
+      isCalibratingRef.current = true;
+      setCalibrationProgress(0);
+      setStatusText("Calibrating ambient noise...");
+
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        } 
+      });
+
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const audioCtx = new AudioContextClass();
+      audioContextRef.current = audioCtx;
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 512;
+      analyserRef.current = analyser;
+      
+      const source = audioCtx.createMediaStreamSource(stream);
+      source.connect(analyser);
+
+      const samples: number[] = [];
+      const startTime = Date.now();
+      const duration = 2000; // 2 seconds calibration
+
+      const calibrate = () => {
+        if (!isCalibratingRef.current || !analyserRef.current) return;
+        
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(100, (elapsed / duration) * 100);
+        setCalibrationProgress(progress);
+
+        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+        analyserRef.current.getByteFrequencyData(dataArray);
+        
+        const sum = dataArray.reduce((a, b) => a + b, 0);
+        const average = sum / dataArray.length;
+        samples.push(average);
+        
+        setVolumeLevel(Math.min(100, (average / 128) * 100));
+
+        if (elapsed < duration) {
+          animationFrameRef.current = requestAnimationFrame(calibrate);
+        } else {
+          const avgNoise = samples.reduce((a, b) => a + b, 0) / samples.length;
+          noiseFloorRef.current = Math.max(10, avgNoise + 5);
+          setNoiseThreshold(Math.min(100, ((noiseFloorRef.current + 10) / 128) * 100));
+          
+          setIsCalibrating(false);
+          isCalibratingRef.current = false;
+          setIsCalibrated(true);
+          setVolumeLevel(0);
+          
+          // Clean up stream used for calibration
+          stream.getTracks().forEach(track => track.stop());
+          audioCtx.close();
+        }
+      };
+
+      calibrate();
+    } catch (err) {
+      setError("Microphone access denied. Calibration failed.");
+      setIsCalibrating(false);
+      isCalibratingRef.current = false;
+    }
+  };
 
   useEffect(() => {
     return () => {
@@ -184,13 +259,6 @@ export default function VoiceLogger({ onExtracted, onCancel }: VoiceLoggerProps)
           const currentVolume = Math.min(100, (average / 128) * 100);
           setVolumeLevel(currentVolume);
 
-          // Calibrate noise floor for the first 500ms
-          if (Date.now() - lastSpokenTimeRef.current < 500 && !hasSpokenRef.current) {
-             calibrationSamplesRef.current.push(average);
-             const avgNoise = calibrationSamplesRef.current.reduce((a,b) => a+b, 0) / calibrationSamplesRef.current.length;
-             noiseFloorRef.current = Math.max(10, avgNoise + 5); 
-          }
-
           // Speech detection threshold (dynamic based on noise floor)
           const threshold = Math.max(15, noiseFloorRef.current + 10);
           setNoiseThreshold(Math.min(100, (threshold / 128) * 100));
@@ -275,6 +343,13 @@ export default function VoiceLogger({ onExtracted, onCancel }: VoiceLoggerProps)
   useEffect(() => {
     if (currentStepIndex >= STEPS.length) return;
 
+    if (!isCalibrated) {
+      if (!isCalibrating) {
+        runCalibration();
+      }
+      return;
+    }
+
     setStatusText("Waiting for prompt to finish...");
     window.speechSynthesis.cancel();
     const msg = new SpeechSynthesisUtterance(STEPS[currentStepIndex].prompt);
@@ -291,7 +366,7 @@ export default function VoiceLogger({ onExtracted, onCancel }: VoiceLoggerProps)
     return () => {
       window.speechSynthesis.cancel();
     };
-  }, [currentStepIndex]);
+  }, [currentStepIndex, isCalibrated, isCalibrating]);
 
   return (
     <motion.div 
@@ -337,6 +412,34 @@ export default function VoiceLogger({ onExtracted, onCancel }: VoiceLoggerProps)
                 />
               </div>
               <p className="text-sm text-slate-500 mt-2 text-right">{Math.round(processingProgress)}%</p>
+            </div>
+          </div>
+        ) : isCalibrating ? (
+          <div className="flex flex-col items-center w-full">
+            <div className="relative mb-8">
+              <motion.div
+                className="absolute inset-0 bg-indigo-500/20 rounded-full blur-xl"
+                animate={{
+                  scale: 1 + (volumeLevel / 100) * 1.2,
+                  opacity: 0.2 + (volumeLevel / 100) * 0.5,
+                }}
+              />
+              <div className="relative z-10 w-20 h-20 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center">
+                <Mic className="w-8 h-8 animate-pulse" />
+              </div>
+            </div>
+            <p className="text-slate-700 font-bold mb-2">{statusText}</p>
+            <p className="text-sm text-slate-500 mb-6">Please stay silent for a moment...</p>
+            <div className="w-full max-w-xs mx-auto">
+              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                <motion.div 
+                  className="h-full bg-indigo-600"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${calibrationProgress}%` }}
+                  transition={{ duration: 0.1 }}
+                />
+              </div>
+              <p className="text-sm text-slate-500 mt-2 text-right">{Math.round(calibrationProgress)}%</p>
             </div>
           </div>
         ) : (

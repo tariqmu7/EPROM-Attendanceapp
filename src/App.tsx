@@ -9,7 +9,8 @@ import CardScanner from './components/CardScanner';
 import ReviewForm from './components/ReviewForm';
 import ManualEntryForm from './components/ManualEntryForm';
 import Dashboard from './components/Dashboard';
-import { Mic, Camera, LogOut, Building2, FileText } from 'lucide-react';
+import ScheduleManager from './components/ScheduleManager';
+import { Mic, Camera, LogOut, Building2, FileText, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { ToastContainer, toast } from 'react-toastify';
@@ -27,7 +28,7 @@ export interface AttendanceRecord {
   synced?: number;
 }
 
-type AppState = 'dashboard' | 'voice' | 'scan' | 'review' | 'manual';
+type AppState = 'dashboard' | 'voice' | 'scan' | 'review' | 'manual' | 'schedule';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -126,23 +127,37 @@ export default function App() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 relative overflow-hidden">
+        {/* Decorative background elements */}
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-indigo-100 rounded-full blur-3xl opacity-50"></div>
+        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-blue-100 rounded-full blur-3xl opacity-50"></div>
+        
         <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white p-10 rounded-3xl shadow-2xl max-w-md w-full text-center relative z-10 border border-slate-100"
         >
-          <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <Building2 className="w-8 h-8" />
+          <div className="mb-8">
+            <img 
+              src="https://eprom.com.eg/wp-content/uploads/2024/07/epromlogo-scaled.gif" 
+              alt="EPROM Logo" 
+              className="h-24 mx-auto object-contain"
+              referrerPolicy="no-referrer"
+            />
           </div>
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">EPROM</h1>
-          <p className="text-slate-500 mb-8">Smart Attendance Logging System</p>
+          <h1 className="text-3xl font-extrabold text-slate-800 mb-2 tracking-tight">Welcome to EPROM</h1>
+          <p className="text-slate-500 mb-10 text-lg">Booth Attendance & Visitor Logging</p>
+          
           <button
             onClick={login}
-            className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition-colors shadow-sm"
+            className="w-full py-4 px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-lg transition-all shadow-lg hover:shadow-indigo-200 hover:-translate-y-0.5 active:translate-y-0"
           >
-            Sign in with Google
+            Start Visitor Log
           </button>
+          
+          <div className="mt-8 pt-8 border-t border-slate-100">
+            <p className="text-xs text-slate-400 uppercase tracking-widest font-semibold">Egyptian Projects Operation & Maintenance</p>
+          </div>
         </motion.div>
       </div>
     );
@@ -150,20 +165,39 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
-      <ToastContainer position="bottom-left" />
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-sm">
-              <Building2 className="w-5 h-5" />
-            </div>
-            <h1 className="text-xl font-bold text-slate-800 tracking-tight">EPROM Attendance</h1>
-          </div>
+      <ToastContainer position="bottom-left" aria-label="Notifications" />
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
+        <div className="max-w-5xl mx-auto px-4 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <span className="text-sm font-medium text-slate-600 hidden sm:block">{user.displayName}</span>
+            <img 
+              src="https://eprom.com.eg/wp-content/uploads/2024/07/epromlogo-scaled.gif" 
+              alt="EPROM Logo" 
+              className="h-12 object-contain"
+              referrerPolicy="no-referrer"
+            />
+            <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+            <h1 className="text-xl font-bold text-slate-800 tracking-tight hidden sm:block">Attendance System</h1>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <button
+              onClick={() => setAppState('schedule')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all ${
+                appState === 'schedule' 
+                  ? 'bg-indigo-600 text-white shadow-md' 
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <Calendar className="w-5 h-5" />
+              <span className="hidden md:block">Booth Schedule</span>
+            </button>
+            <div className="h-8 w-px bg-slate-200"></div>
+            <div className="text-right hidden sm:block">
+              <p className="text-sm font-bold text-slate-800">{user.displayName}</p>
+              <p className="text-xs text-slate-500">Booth Staff</p>
+            </div>
             <button 
               onClick={logout}
-              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
               title="Sign Out"
             >
               <LogOut className="w-5 h-5" />
@@ -182,7 +216,7 @@ export default function App() {
               exit={{ opacity: 0, y: -10 }}
               className="space-y-8"
             >
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <button
                   onClick={() => {
                     if (!isOnline) return;
@@ -190,20 +224,23 @@ export default function App() {
                     setAppState('voice');
                   }}
                   disabled={!isOnline}
-                  className={`group relative overflow-hidden bg-white p-6 rounded-2xl shadow-sm border border-slate-200 transition-all text-left flex items-center gap-6 ${
-                    isOnline ? 'hover:border-indigo-300 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+                  className={`group relative overflow-hidden bg-white p-8 rounded-3xl shadow-sm border border-slate-200 transition-all text-left flex flex-col gap-6 ${
+                    isOnline ? 'hover:border-indigo-400 hover:shadow-xl hover:-translate-y-1 cursor-pointer' : 'opacity-60 cursor-not-allowed'
                   }`}
                 >
-                  <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-transform ${
-                    isOnline ? 'bg-indigo-50 text-indigo-600 group-hover:scale-110' : 'bg-slate-100 text-slate-400'
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all ${
+                    isOnline ? 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white' : 'bg-slate-100 text-slate-400'
                   }`}>
-                    <Mic className="w-7 h-7" />
+                    <Mic className="w-8 h-8" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-800 mb-1">Voice Log</h3>
-                    <p className="text-sm text-slate-500">
-                      {isOnline ? 'Record attendance via voice' : 'Requires internet'}
+                    <h3 className="text-xl font-bold text-slate-800 mb-2">Voice Log</h3>
+                    <p className="text-sm text-slate-500 leading-relaxed">
+                      {isOnline ? 'Speak naturally to record visitor details instantly.' : 'Voice logging requires an active internet connection.'}
                     </p>
+                  </div>
+                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <Mic className="w-24 h-24 -mr-8 -mt-8" />
                   </div>
                 </button>
 
@@ -214,20 +251,23 @@ export default function App() {
                     setAppState('scan');
                   }}
                   disabled={!isOnline}
-                  className={`group relative overflow-hidden bg-white p-6 rounded-2xl shadow-sm border border-slate-200 transition-all text-left flex items-center gap-6 ${
-                    isOnline ? 'hover:border-emerald-300 hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'
+                  className={`group relative overflow-hidden bg-white p-8 rounded-3xl shadow-sm border border-slate-200 transition-all text-left flex flex-col gap-6 ${
+                    isOnline ? 'hover:border-emerald-400 hover:shadow-xl hover:-translate-y-1 cursor-pointer' : 'opacity-60 cursor-not-allowed'
                   }`}
                 >
-                  <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-transform ${
-                    isOnline ? 'bg-emerald-50 text-emerald-600 group-hover:scale-110' : 'bg-slate-100 text-slate-400'
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all ${
+                    isOnline ? 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white' : 'bg-slate-100 text-slate-400'
                   }`}>
-                    <Camera className="w-7 h-7" />
+                    <Camera className="w-8 h-8" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-800 mb-1">Scan Card</h3>
-                    <p className="text-sm text-slate-500">
-                      {isOnline ? 'Extract from business card' : 'Requires internet'}
+                    <h3 className="text-xl font-bold text-slate-800 mb-2">Scan Card</h3>
+                    <p className="text-sm text-slate-500 leading-relaxed">
+                      {isOnline ? 'Take a photo of a business card to extract data.' : 'Card scanning requires an active internet connection.'}
                     </p>
+                  </div>
+                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <Camera className="w-24 h-24 -mr-8 -mt-8" />
                   </div>
                 </button>
 
@@ -236,14 +276,33 @@ export default function App() {
                     setEditingLog(null);
                     setAppState('manual');
                   }}
-                  className="group relative overflow-hidden bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:border-amber-300 hover:shadow-md transition-all text-left flex items-center gap-6"
+                  className="group relative overflow-hidden bg-white p-8 rounded-3xl shadow-sm border border-slate-200 hover:border-amber-400 hover:shadow-xl hover:-translate-y-1 transition-all text-left flex flex-col gap-6"
                 >
-                  <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <FileText className="w-7 h-7" />
+                  <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition-all">
+                    <FileText className="w-8 h-8" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-800 mb-1">Manual Entry</h3>
-                    <p className="text-sm text-slate-500">Type data manually (offline)</p>
+                    <h3 className="text-xl font-bold text-slate-800 mb-2">Manual Entry</h3>
+                    <p className="text-sm text-slate-500 leading-relaxed">Enter visitor information manually. Works perfectly offline.</p>
+                  </div>
+                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <FileText className="w-24 h-24 -mr-8 -mt-8" />
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => setAppState('schedule')}
+                  className="group relative overflow-hidden bg-white p-8 rounded-3xl shadow-sm border border-slate-200 hover:border-indigo-400 hover:shadow-xl hover:-translate-y-1 transition-all text-left flex flex-col gap-6"
+                >
+                  <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                    <Calendar className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-800 mb-2">Booth Schedule</h3>
+                    <p className="text-sm text-slate-500 leading-relaxed">View and manage the 3-day session schedule for the booth.</p>
+                  </div>
+                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <Calendar className="w-24 h-24 -mr-8 -mt-8" />
                   </div>
                 </button>
               </div>
@@ -287,6 +346,12 @@ export default function App() {
                 onCancel={() => setAppState('dashboard')} 
                 isEdit={!!editingLog}
               />
+            </motion.div>
+          )}
+
+          {appState === 'schedule' && (
+            <motion.div key="schedule" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+              <ScheduleManager onBack={() => setAppState('dashboard')} />
             </motion.div>
           )}
         </AnimatePresence>
