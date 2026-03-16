@@ -232,18 +232,18 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
                     </div>
                   </div>
                 </div>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex gap-2">
                   <button 
                     onClick={() => setEditingItem(item)}
-                    className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                    className="p-4 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all active:scale-95"
                   >
-                    <Edit2 className="w-5 h-5" />
+                    <Edit2 className="w-6 h-6" />
                   </button>
                   <button 
                     onClick={() => item.id && handleDelete(item.id)}
-                    className="p-3 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                    className="p-4 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all active:scale-95"
                   >
-                    <Trash2 className="w-5 h-5" />
+                    <Trash2 className="w-6 h-6" />
                   </button>
                 </div>
               </div>

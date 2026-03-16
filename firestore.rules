@@ -38,15 +38,15 @@ service cloud.firestore {
     }
 
     match /attendanceLogs/{logId} {
-      allow read: if isAuthenticated() && request.auth.uid == resource.data.authorUid;
-      allow create: if isAuthenticated() && isValidLog(request.resource.data) && uidUnchanged();
-      allow update: if isOwner() && isValidLog(request.resource.data) && uidNotModified();
-      allow delete: if isOwner();
+      allow read: if true;
+      allow create: if isValidLog(request.resource.data);
+      allow update: if isValidLog(request.resource.data);
+      allow delete: if true;
     }
 
     match /schedule/{itemId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && isValidScheduleItem(request.resource.data);
+      allow read: if true;
+      allow write: if isValidScheduleItem(request.resource.data);
     }
   }
 }

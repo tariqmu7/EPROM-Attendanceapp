@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { auth, login, logout, db } from './firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { addDoc, collection } from 'firebase/firestore';
+import { db } from './firebase';
+import { addDoc, collection, doc, updateDoc, onSnapshot, query } from 'firebase/firestore';
 import { ExtractedData } from './services/gemini';
 import { handleFirestoreError, OperationType } from './utils/errorHandler';
 import VoiceLogger from './components/VoiceLogger';
@@ -10,9 +9,8 @@ import ReviewForm from './components/ReviewForm';
 import ManualEntryForm from './components/ManualEntryForm';
 import Dashboard from './components/Dashboard';
 import ScheduleManager from './components/ScheduleManager';
-import { Mic, Camera, LogOut, Building2, FileText, Calendar } from 'lucide-react';
+import { Mic, Camera, Building2, FileText, Calendar, WifiOff, CheckCircle2, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { doc, updateDoc } from 'firebase/firestore';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -31,12 +29,32 @@ export interface AttendanceRecord {
 type AppState = 'dashboard' | 'voice' | 'scan' | 'review' | 'manual' | 'schedule';
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
   const [appState, setAppState] = useState<AppState>('dashboard');
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
   const [editingLog, setEditingLog] = useState<AttendanceRecord | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [unsyncedCount, setUnsyncedCount] = useState(0);
+  const [prevUnsyncedCount, setPrevUnsyncedCount] = useState(0);
+
+  useEffect(() => {
+    if (prevUnsyncedCount > 0 && unsyncedCount === 0 && isOnline) {
+      toast.success('All offline logs synced successfully');
+    }
+    setPrevUnsyncedCount(unsyncedCount);
+  }, [unsyncedCount, isOnline, prevUnsyncedCount]);
+
+  useEffect(() => {
+    const path = 'attendanceLogs';
+    const q = query(collection(db, path));
+    const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
+      let count = 0;
+      snapshot.docs.forEach(doc => {
+        if (doc.metadata.hasPendingWrites) count++;
+      });
+      setUnsyncedCount(count);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -50,12 +68,7 @@ export default function App() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setIsAuthReady(true);
-    });
     return () => {
-      unsubscribe();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
@@ -80,12 +93,10 @@ export default function App() {
   };
 
   const handleSave = async (data: ExtractedData) => {
-    if (!user) return;
-    
     const logData = {
       ...data,
       timestamp: editingLog ? editingLog.timestamp : Date.now(),
-      authorUid: user.uid,
+      authorUid: 'local-user',
     };
 
     try {
@@ -117,96 +128,68 @@ export default function App() {
     }
   };
 
-  if (!isAuthReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 relative overflow-hidden">
-        {/* Decorative background elements */}
-        <div className="absolute -top-24 -right-24 w-96 h-96 bg-indigo-100 rounded-full blur-3xl opacity-50"></div>
-        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-blue-100 rounded-full blur-3xl opacity-50"></div>
-        
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white p-10 rounded-3xl shadow-2xl max-w-md w-full text-center relative z-10 border border-slate-100"
-        >
-          <div className="mb-8">
-            <img 
-              src="https://eprom.com.eg/wp-content/uploads/2024/07/epromlogo-scaled.gif" 
-              alt="EPROM Logo" 
-              className="h-24 mx-auto object-contain"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-          <h1 className="text-3xl font-extrabold text-slate-800 mb-2 tracking-tight">Welcome to EPROM</h1>
-          <p className="text-slate-500 mb-10 text-lg">Booth Attendance & Visitor Logging</p>
-          
-          <button
-            onClick={login}
-            className="w-full py-4 px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-lg transition-all shadow-lg hover:shadow-indigo-200 hover:-translate-y-0.5 active:translate-y-0"
-          >
-            Start Visitor Log
-          </button>
-          
-          <div className="mt-8 pt-8 border-t border-slate-100">
-            <p className="text-xs text-slate-400 uppercase tracking-widest font-semibold">Egyptian Projects Operation & Maintenance</p>
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
       <ToastContainer position="bottom-left" aria-label="Notifications" />
       <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
-        <div className="max-w-5xl mx-auto px-4 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="max-w-6xl mx-auto px-6 md:px-8 h-24 flex items-center justify-between">
+          <div className="flex items-center gap-4 sm:gap-6">
             <img 
               src="https://eprom.com.eg/wp-content/uploads/2024/07/epromlogo-scaled.gif" 
               alt="EPROM Logo" 
-              className="h-12 object-contain"
+              className="h-14 object-contain"
               referrerPolicy="no-referrer"
             />
-            <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
-            <h1 className="text-xl font-bold text-slate-800 tracking-tight hidden sm:block">Attendance System</h1>
+            <div className="h-10 w-px bg-slate-200 hidden sm:block"></div>
+            <h1 className="text-2xl font-bold text-slate-800 tracking-tight hidden sm:block">Attendance System</h1>
           </div>
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-3 sm:gap-6">
             <button
               onClick={() => setAppState('schedule')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all ${
+              className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all text-sm sm:text-base ${
                 appState === 'schedule' 
                   ? 'bg-indigo-600 text-white shadow-md' 
                   : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
-              <Calendar className="w-5 h-5" />
+              <Calendar className="w-6 h-6" />
               <span className="hidden md:block">Booth Schedule</span>
             </button>
-            <div className="h-8 w-px bg-slate-200"></div>
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-bold text-slate-800">{user.displayName}</p>
-              <p className="text-xs text-slate-500">Booth Staff</p>
+            <div className="h-10 w-px bg-slate-200 hidden sm:block"></div>
+            <div className="flex items-center gap-3">
+              <motion.div 
+                layout
+                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-full flex items-center gap-1.5 sm:gap-2 font-medium text-xs sm:text-sm border ${
+                  unsyncedCount > 0 
+                    ? 'bg-amber-100/90 text-amber-800 border-amber-200' 
+                    : 'bg-slate-50/90 text-slate-600 border-slate-200'
+                }`}
+              >
+                {unsyncedCount > 0 ? (
+                  <Clock className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                )}
+                <span className="hidden lg:inline">{unsyncedCount} pending sync</span>
+                <span className="lg:hidden">{unsyncedCount}</span>
+              </motion.div>
+              <motion.div 
+                layout
+                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-full flex items-center gap-1.5 sm:gap-2 font-medium text-xs sm:text-sm border ${
+                  isOnline 
+                    ? 'bg-emerald-50/90 text-emerald-700 border-emerald-200' 
+                    : 'bg-slate-800/90 text-white border-slate-700'
+                }`}
+              >
+                {isOnline ? <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" /> : <WifiOff className="w-4 h-4 sm:w-5 sm:h-5" />}
+                <span className="hidden lg:inline">{isOnline ? 'Online' : 'Offline'}</span>
+              </motion.div>
             </div>
-            <button 
-              onClick={logout}
-              className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-              title="Sign Out"
-            >
-              <LogOut className="w-5 h-5" />
-            </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-8">
+      <main className="max-w-6xl mx-auto px-6 md:px-8 py-8 md:py-10">
         <AnimatePresence mode="wait">
           {appState === 'dashboard' && (
             <motion.div 
@@ -216,7 +199,7 @@ export default function App() {
               exit={{ opacity: 0, y: -10 }}
               className="space-y-8"
             >
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
                 <button
                   onClick={() => {
                     if (!isOnline) return;

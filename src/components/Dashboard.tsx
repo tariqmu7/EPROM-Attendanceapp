@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { collection, onSnapshot, query, where, doc, deleteDoc } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { collection, onSnapshot, query, doc, deleteDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import * as XLSX from 'xlsx';
-import { Download, WifiOff, CheckCircle2, Clock, Edit2, Trash2 } from 'lucide-react';
+import { Download, Edit2, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../utils/errorHandler';
 import { AttendanceRecord } from '../App';
@@ -14,30 +14,11 @@ interface DashboardProps {
 
 export default function Dashboard({ onEdit }: DashboardProps) {
   const [logs, setLogs] = useState<AttendanceRecord[]>([]);
-  const [unsyncedCount, setUnsyncedCount] = useState(0);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [prevUnsyncedCount, setPrevUnsyncedCount] = useState(0);
 
   useEffect(() => {
-    if (prevUnsyncedCount > 0 && unsyncedCount === 0 && isOnline) {
-      toast.success('All offline logs synced successfully');
-    }
-    setPrevUnsyncedCount(unsyncedCount);
-  }, [unsyncedCount, isOnline, prevUnsyncedCount]);
-
-  useEffect(() => {
-    // Listen for online/offline status
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    const user = auth.currentUser;
-    if (!user) return;
-
     // Listen to Firebase
     const path = 'attendanceLogs';
-    const q = query(collection(db, path), where('authorUid', '==', user.uid));
+    const q = query(collection(db, path));
     const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
       const fetchedLogs = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -49,14 +30,11 @@ export default function Dashboard({ onEdit }: DashboardProps) {
       fetchedLogs.sort((a, b) => b.timestamp - a.timestamp);
       
       setLogs(fetchedLogs);
-      setUnsyncedCount(fetchedLogs.filter(log => log.synced === 0).length);
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, path);
     });
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
       unsubscribe();
     };
   }, []);
@@ -98,42 +76,10 @@ export default function Dashboard({ onEdit }: DashboardProps) {
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
-      {/* Persistent Status Indicator */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 items-end">
-        <motion.div 
-          layout
-          initial={{ opacity: 0, y: 20, scale: 0.9 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          className={`px-4 py-2 rounded-full shadow-lg flex items-center gap-2 font-medium text-sm border backdrop-blur-sm ${
-            unsyncedCount > 0 
-              ? 'bg-amber-100/90 text-amber-800 border-amber-200' 
-              : 'bg-slate-50/90 text-slate-600 border-slate-200'
-          }`}
-        >
-          {unsyncedCount > 0 ? (
-            <Clock className="w-4 h-4 animate-pulse" />
-          ) : (
-            <CheckCircle2 className="w-4 h-4" />
-          )}
-          {unsyncedCount} pending sync
-        </motion.div>
-        <motion.div 
-          layout
-          className={`px-4 py-2 rounded-full shadow-lg flex items-center gap-2 font-medium text-sm border backdrop-blur-sm ${
-            isOnline 
-              ? 'bg-emerald-50/90 text-emerald-700 border-emerald-200' 
-              : 'bg-slate-800/90 text-white border-slate-700'
-          }`}
-        >
-          {isOnline ? <CheckCircle2 className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
-          {isOnline ? 'System Online' : 'System Offline'}
-        </motion.div>
-      </div>
-
       <div className="p-8 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 bg-slate-50/50">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-100">
-            <CheckCircle2 className="w-6 h-6" />
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check-circle-2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
           </div>
           <div>
             <h2 className="text-2xl font-bold text-slate-800">Visitor Log</h2>
@@ -152,12 +98,12 @@ export default function Dashboard({ onEdit }: DashboardProps) {
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-slate-50/50 text-slate-400 text-xs uppercase tracking-[0.2em] font-black">
-              <th className="p-5">Visitor</th>
-              <th className="p-5">Affiliation</th>
-              <th className="p-5">Purpose</th>
-              <th className="p-5">Timestamp</th>
-              <th className="p-5 text-right">Manage</th>
+            <tr className="bg-slate-50/50 text-slate-400 text-sm uppercase tracking-[0.2em] font-black">
+              <th className="p-6">Visitor</th>
+              <th className="p-6">Affiliation</th>
+              <th className="p-6">Purpose</th>
+              <th className="p-6">Timestamp</th>
+              <th className="p-6 text-right">Manage</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -184,50 +130,50 @@ export default function Dashboard({ onEdit }: DashboardProps) {
                     key={log.id || i} 
                     className="hover:bg-slate-50 transition-colors group"
                   >
-                    <td className="p-5">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-bold">
+                    <td className="p-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-bold text-lg">
                           {log.name.charAt(0).toUpperCase()}
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <div className="font-bold text-slate-800">{log.name}</div>
+                            <div className="font-bold text-slate-800 text-lg">{log.name}</div>
                             {log.synced === 0 && (
-                              <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-black rounded-full uppercase tracking-wider">
+                              <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[11px] font-black rounded-full uppercase tracking-wider">
                                 Offline
                               </span>
                             )}
                           </div>
-                          <div className="text-sm text-slate-500">{log.phone}</div>
+                          <div className="text-base text-slate-500">{log.phone}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="p-5">
-                      <div className="font-semibold text-slate-700">{log.company || '-'}</div>
-                      <div className="text-sm text-slate-500">{log.title}</div>
+                    <td className="p-6">
+                      <div className="font-semibold text-slate-700 text-base">{log.company || '-'}</div>
+                      <div className="text-base text-slate-500">{log.title}</div>
                     </td>
-                    <td className="p-5 text-slate-600 max-w-xs truncate italic">
+                    <td className="p-6 text-slate-600 max-w-xs truncate italic text-base">
                       "{log.reason || '-'}"
                     </td>
-                    <td className="p-5 text-sm text-slate-500 whitespace-nowrap">
+                    <td className="p-6 text-base text-slate-500 whitespace-nowrap">
                       <div className="font-medium text-slate-700">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                      <div className="text-xs text-slate-400">{new Date(log.timestamp).toLocaleDateString()}</div>
+                      <div className="text-sm text-slate-400">{new Date(log.timestamp).toLocaleDateString()}</div>
                     </td>
-                    <td className="p-5 text-right">
-                      <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
+                    <td className="p-6 text-right">
+                      <div className="flex justify-end gap-3">
                         <button 
                           onClick={() => onEdit(log)}
-                          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                          className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all active:scale-95"
                           title="Edit Log"
                         >
-                          <Edit2 className="w-4 h-4" />
+                          <Edit2 className="w-5 h-5" />
                         </button>
                         <button 
                           onClick={() => handleDelete(log)}
-                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                          className="p-3 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all active:scale-95"
                           title="Delete Log"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-5 h-5" />
                         </button>
                       </div>
                     </td>
