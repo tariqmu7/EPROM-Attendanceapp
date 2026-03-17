@@ -8,6 +8,8 @@ export interface ExtractedData {
   company: string;
   title: string;
   reason: string;
+  cardImageBase64?: string;
+  cardImageMimeType?: string;
 }
 
 const dataSchema = {
@@ -76,5 +78,8 @@ export async function analyzeBusinessCard(imageBase64: string, mimeType: string)
 
   const text = response.text;
   if (!text) throw new Error("No response from Gemini");
-  return JSON.parse(text) as ExtractedData;
+  const extracted = JSON.parse(text) as ExtractedData;
+  extracted.cardImageBase64 = imageBase64;
+  extracted.cardImageMimeType = mimeType;
+  return extracted;
 }

@@ -6,19 +6,34 @@ export interface ScriptResponse {
   error?: string;
 }
 
+let hasWarnedMissingUrl = false;
+
 export async function fetchFromScript(action: string, payload?: any): Promise<ScriptResponse> {
   if (!SCRIPT_URL) {
-    console.warn("VITE_GOOGLE_SCRIPT_URL is not set.");
+    if (!hasWarnedMissingUrl) {
+      console.warn("VITE_GOOGLE_SCRIPT_URL is not set. Data will only be saved locally.");
+      hasWarnedMissingUrl = true;
+    }
     return { success: false, error: "No Script URL configured." };
   }
+  
+  // Clean up the URL just in case it has quotes from the .env file
+  const cleanUrl = SCRIPT_URL.replace(/^["']|["']$/g, '').trim();
+
   try {
-    const response = await fetch(SCRIPT_URL, {
+    const response = await fetch(cleanUrl, {
       method: 'POST',
       body: JSON.stringify({ action, payload }),
       headers: {
         'Content-Type': 'text/plain;charset=utf-8',
-      }
+      },
+      redirect: 'follow'
     });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
     return await response.json();
   } catch (error) {
     console.error("Error fetching from script:", error);
@@ -131,8 +146,16 @@ export async function fetchAllData() {
 export function addLog(log: any) {
   const logs = getLocalLogs();
   const newLog = { ...log, id: log.id || Date.now().toString() + Math.random().toString(36).substring(2) };
-  logs.push(newLog);
+  
+  // Create a copy for local display without the heavy image data to save localStorage space
+  const displayLog = { ...newLog };
+  delete displayLog.cardImageBase64;
+  delete displayLog.cardImageMimeType;
+  
+  logs.push(displayLog);
   saveLocalLogs(logs);
+  
+  // Queue the full log including the image for syncing to the backend
   queueOperation('addLog', newLog);
   if (navigator.onLine) syncQueue();
 }
@@ -151,7 +174,7 @@ export function updateLog(id: string, log: any) {
 export function deleteLog(id: string) {
   const logs = getLocalLogs();
   saveLocalLogs(logs.filter(l => l.id !== id));
-  queueOperation('deleteLog', { id });
+  queueOperation('deleteLog', id);
   if (navigator.onLine) syncQueue();
 }
 
@@ -178,13 +201,13 @@ export function updateScheduleItem(id: string, item: any) {
 export function deleteScheduleItem(id: string) {
   const schedule = getLocalSchedule();
   saveLocalSchedule(schedule.filter(s => s.id !== id));
-  queueOperation('deleteScheduleItem', { id });
+  queueOperation('deleteScheduleItem', id);
   if (navigator.onLine) syncQueue();
 }
 
 export function resetSchedule(defaultItems: any[]) {
   const itemsWithIds = defaultItems.map(item => ({ ...item, id: item.id || Date.now().toString() + Math.random().toString(36).substring(2) }));
   saveLocalSchedule(itemsWithIds);
-  queueOperation('resetSchedule', { items: itemsWithIds });
+  queueOperation('resetSchedule', itemsWithIds);
   if (navigator.onLine) syncQueue();
 }

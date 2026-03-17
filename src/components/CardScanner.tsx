@@ -20,17 +20,61 @@ export default function CardScanner({ onExtracted, onCancel }: CardScannerProps)
     setError(null);
 
     try {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onloadend = async () => {
-        const base64data = reader.result as string;
-        const base64String = base64data.split(',')[1];
+      // Resize image before processing to save bandwidth and localStorage space
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      
+      img.onload = async () => {
+        URL.revokeObjectURL(objectUrl);
         
-        const extracted = await analyzeBusinessCard(base64String, file.type);
-        onExtracted(extracted);
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 1200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error("Could not get canvas context");
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Compress to JPEG
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        const base64String = dataUrl.split(',')[1];
+        
+        try {
+          const extracted = await analyzeBusinessCard(base64String, 'image/jpeg');
+          onExtracted(extracted);
+        } catch (err) {
+          setError("Failed to analyze image. Please try again.");
+          console.error(err);
+          setIsProcessing(false);
+        }
       };
+      
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        setError("Failed to load image.");
+        setIsProcessing(false);
+      };
+      
+      img.src = objectUrl;
     } catch (err) {
-      setError("Failed to analyze image. Please try again.");
+      setError("Failed to process image. Please try again.");
       console.error(err);
       setIsProcessing(false);
     }

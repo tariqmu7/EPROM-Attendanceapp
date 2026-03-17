@@ -22,6 +22,8 @@ export interface AttendanceRecord {
   timestamp: number;
   authorUid: string;
   synced?: number;
+  cardImageBase64?: string;
+  cardImageMimeType?: string;
 }
 
 type AppState = 'dashboard' | 'voice' | 'scan' | 'review' | 'manual' | 'schedule';
