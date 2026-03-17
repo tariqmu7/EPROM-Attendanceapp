@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { collection, onSnapshot, query, doc, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { getLocalLogs, deleteLog } from '../services/googleScript';
 import * as XLSX from 'xlsx';
 import { Download, Edit2, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { handleFirestoreError, OperationType } from '../utils/errorHandler';
 import { AttendanceRecord } from '../App';
 import { toast } from 'react-toastify';
 
@@ -16,26 +14,16 @@ export default function Dashboard({ onEdit }: DashboardProps) {
   const [logs, setLogs] = useState<AttendanceRecord[]>([]);
 
   useEffect(() => {
-    // Listen to Firebase
-    const path = 'attendanceLogs';
-    const q = query(collection(db, path));
-    const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
-      const fetchedLogs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        synced: doc.metadata.hasPendingWrites ? 0 : 1
-      })) as AttendanceRecord[];
-      
-      // Sort in memory to avoid composite index requirement
-      fetchedLogs.sort((a, b) => b.timestamp - a.timestamp);
-      
-      setLogs(fetchedLogs);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, path);
-    });
-
+    const loadLogs = () => {
+      const fetchedLogs = getLocalLogs();
+      setLogs(fetchedLogs.sort((a, b) => b.timestamp - a.timestamp));
+    };
+    
+    loadLogs();
+    window.addEventListener('localDataChanged', loadLogs);
+    
     return () => {
-      unsubscribe();
+      window.removeEventListener('localDataChanged', loadLogs);
     };
   }, []);
 
@@ -61,12 +49,8 @@ export default function Dashboard({ onEdit }: DashboardProps) {
 
     try {
       if (log.id) {
-        deleteDoc(doc(db, 'attendanceLogs', log.id))
-          .then(() => toast.success('Log deleted successfully'))
-          .catch(error => {
-            console.error("Failed to delete log:", error);
-            toast.error('Failed to delete log');
-          });
+        deleteLog(log.id);
+        toast.success(navigator.onLine ? 'Log deleted successfully' : 'Log deleted locally. Will sync when online.');
       }
     } catch (error) {
       console.error("Error initiating delete:", error);

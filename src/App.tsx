@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { db } from './firebase';
-import { addDoc, collection, doc, updateDoc, onSnapshot, query } from 'firebase/firestore';
 import { ExtractedData } from './services/gemini';
-import { handleFirestoreError, OperationType } from './utils/errorHandler';
+import { fetchAllData, addLog, updateLog, getUnsyncedCount, syncQueue } from './services/googleScript';
 import VoiceLogger from './components/VoiceLogger';
 import CardScanner from './components/CardScanner';
 import ReviewForm from './components/ReviewForm';
@@ -44,17 +42,21 @@ export default function App() {
   }, [unsyncedCount, isOnline, prevUnsyncedCount]);
 
   useEffect(() => {
-    const path = 'attendanceLogs';
-    const q = query(collection(db, path));
-    const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
-      let count = 0;
-      snapshot.docs.forEach(doc => {
-        if (doc.metadata.hasPendingWrites) count++;
-      });
-      setUnsyncedCount(count);
-    });
-    return () => unsubscribe();
-  }, []);
+    const handleQueueChange = () => {
+      setUnsyncedCount(getUnsyncedCount());
+    };
+    window.addEventListener('queueChanged', handleQueueChange);
+    
+    // Initial fetch
+    if (isOnline) {
+      fetchAllData();
+      syncQueue();
+    }
+    
+    return () => {
+      window.removeEventListener('queueChanged', handleQueueChange);
+    };
+  }, [isOnline]);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -100,23 +102,12 @@ export default function App() {
     };
 
     try {
-      const path = 'attendanceLogs';
       if (editingLog && editingLog.id) {
-        // Update existing Firestore doc (don't await so it works offline)
-        updateDoc(doc(db, path, editingLog.id as string), logData)
-          .then(() => toast.success('Log updated successfully'))
-          .catch(error => {
-            console.error("Failed to update log:", error);
-            toast.error('Failed to update log');
-          });
+        updateLog(editingLog.id, logData);
+        toast.success(isOnline ? 'Log updated successfully' : 'Log updated locally. Will sync when online.');
       } else {
-        // Create new (don't await so it works offline)
-        addDoc(collection(db, path), logData)
-          .then(() => toast.success('Log saved successfully'))
-          .catch(error => {
-            console.error("Failed to add log:", error);
-            toast.error('Failed to save log');
-          });
+        addLog(logData);
+        toast.success(isOnline ? 'Log saved successfully' : 'Log saved locally. Will sync when online.');
       }
       
       setAppState('dashboard');

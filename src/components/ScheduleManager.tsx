@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase';
-import { collection, onSnapshot, doc, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { getLocalSchedule, addScheduleItem, updateScheduleItem, deleteScheduleItem, resetSchedule } from '../services/googleScript';
 import { motion, AnimatePresence } from 'motion/react';
 import { Calendar, Clock, User, BookOpen, Edit2, Save, X, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -26,23 +25,25 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
   const [isAdding, setIsAdding] = useState(false);
 
   useEffect(() => {
-    const q = query(collection(db, 'schedule'), orderBy('startTime', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const scheduleData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as ScheduleItem[];
+    const loadSchedule = () => {
+      const scheduleData = getLocalSchedule();
+      scheduleData.sort((a, b) => a.startTime.localeCompare(b.startTime));
       setItems(scheduleData);
 
-      // Initialize with default data if empty
       if (scheduleData.length === 0) {
         seedDefaultSchedule();
       }
-    });
-    return () => unsubscribe();
+    };
+
+    loadSchedule();
+    window.addEventListener('localDataChanged', loadSchedule);
+
+    return () => {
+      window.removeEventListener('localDataChanged', loadSchedule);
+    };
   }, []);
 
-  const seedDefaultSchedule = async () => {
+  const seedDefaultSchedule = () => {
     const defaultItems: ScheduleItem[] = [];
     const subjects = ["Digital Transformation", "Asset Integrity", "Operational Excellence", "Predictive Maintenance", "Safety First"];
     
@@ -81,20 +82,11 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
     }
 
     for (const item of defaultItems) {
-      await addDocToFirestore(item);
+      addScheduleItem(item);
     }
   };
 
-  const addDocToFirestore = async (item: ScheduleItem) => {
-    try {
-      const newDocRef = doc(collection(db, 'schedule'));
-      await setDoc(newDocRef, item);
-    } catch (error) {
-      console.error("Error seeding schedule:", error);
-    }
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingItem) return;
 
@@ -108,12 +100,11 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
 
     try {
       if (editingItem.id) {
-        await setDoc(doc(db, 'schedule', editingItem.id), editingItem);
-        toast.success('Session updated');
+        updateScheduleItem(editingItem.id, editingItem);
+        toast.success(navigator.onLine ? 'Session updated' : 'Session updated locally');
       } else {
-        const newDocRef = doc(collection(db, 'schedule'));
-        await setDoc(newDocRef, editingItem);
-        toast.success('Session added');
+        addScheduleItem(editingItem);
+        toast.success(navigator.onLine ? 'Session added' : 'Session added locally');
       }
       setEditingItem(null);
       setIsAdding(false);
@@ -122,25 +113,51 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (!window.confirm('Are you sure you want to delete this session?')) return;
     try {
-      await deleteDoc(doc(db, 'schedule', id));
-      toast.success('Session deleted');
+      deleteScheduleItem(id);
+      toast.success(navigator.onLine ? 'Session deleted' : 'Session deleted locally');
     } catch (error) {
       toast.error('Failed to delete session');
     }
   };
 
-  const handleReset = async () => {
+  const handleReset = () => {
     if (!window.confirm('This will delete all current sessions and reset to the default spread. Continue?')) return;
     try {
-      // Delete all
-      for (const item of items) {
-        if (item.id) await deleteDoc(doc(db, 'schedule', item.id));
+      const defaultItems: ScheduleItem[] = [];
+      const subjects = ["Digital Transformation", "Asset Integrity", "Operational Excellence", "Predictive Maintenance", "Safety First"];
+      
+      for (let day = 1; day <= 3; day++) {
+        const startHour = day === 1 ? 14 : 10;
+        const endHour = 19;
+        const totalAvailableMins = (endHour - startHour) * 60;
+        const sessionDuration = 20;
+        const totalSessionTime = 5 * sessionDuration;
+        const totalGapTime = totalAvailableMins - totalSessionTime;
+        const gapPerSession = Math.floor(totalGapTime / 4);
+
+        for (let i = 0; i < 5; i++) {
+          const currentMins = (startHour * 60) + (i * (sessionDuration + gapPerSession));
+          const sessionStartH = Math.floor(currentMins / 60);
+          const sessionStartM = currentMins % 60;
+          const sessionEndMins = currentMins + sessionDuration;
+          const sessionEndH = Math.floor(sessionEndMins / 60);
+          const sessionEndM = sessionEndMins % 60;
+
+          defaultItems.push({
+            day,
+            startTime: `${sessionStartH.toString().padStart(2, '0')}:${sessionStartM.toString().padStart(2, '0')}`,
+            endTime: `${sessionEndH.toString().padStart(2, '0')}:${sessionEndM.toString().padStart(2, '0')}`,
+            title: `EPROM Technical Session ${i + 1}`,
+            speaker: "EPROM Expert",
+            subject: subjects[i]
+          });
+        }
       }
-      await seedDefaultSchedule();
-      toast.success('Schedule reset to default spread');
+      resetSchedule(defaultItems);
+      toast.success(navigator.onLine ? 'Schedule reset to default spread' : 'Schedule reset locally');
     } catch (error) {
       toast.error('Failed to reset schedule');
     }
