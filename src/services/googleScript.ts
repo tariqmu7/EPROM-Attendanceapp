@@ -34,7 +34,19 @@ const QUEUE_KEY = 'offline_sync_queue';
 // --- Local Data Management ---
 
 export function getLocalLogs(): any[] {
-  return JSON.parse(localStorage.getItem(LOGS_KEY) || '[]');
+  const logs = JSON.parse(localStorage.getItem(LOGS_KEY) || '[]');
+  // Deduplicate IDs if any exist
+  const seen = new Set();
+  let changed = false;
+  logs.forEach((log: any) => {
+    if (seen.has(log.id)) {
+      log.id = Date.now().toString() + Math.random().toString(36).substring(2);
+      changed = true;
+    }
+    seen.add(log.id);
+  });
+  if (changed) saveLocalLogs(logs);
+  return logs;
 }
 
 export function saveLocalLogs(logs: any[]) {
@@ -43,7 +55,19 @@ export function saveLocalLogs(logs: any[]) {
 }
 
 export function getLocalSchedule(): any[] {
-  return JSON.parse(localStorage.getItem(SCHEDULE_KEY) || '[]');
+  const schedule = JSON.parse(localStorage.getItem(SCHEDULE_KEY) || '[]');
+  // Deduplicate IDs if any exist
+  const seen = new Set();
+  let changed = false;
+  schedule.forEach((item: any) => {
+    if (seen.has(item.id)) {
+      item.id = Date.now().toString() + Math.random().toString(36).substring(2);
+      changed = true;
+    }
+    seen.add(item.id);
+  });
+  if (changed) saveLocalSchedule(schedule);
+  return schedule;
 }
 
 export function saveLocalSchedule(schedule: any[]) {
@@ -106,7 +130,7 @@ export async function fetchAllData() {
 
 export function addLog(log: any) {
   const logs = getLocalLogs();
-  const newLog = { ...log, id: log.id || Date.now().toString() };
+  const newLog = { ...log, id: log.id || Date.now().toString() + Math.random().toString(36).substring(2) };
   logs.push(newLog);
   saveLocalLogs(logs);
   queueOperation('addLog', newLog);
@@ -133,7 +157,7 @@ export function deleteLog(id: string) {
 
 export function addScheduleItem(item: any) {
   const schedule = getLocalSchedule();
-  const newItem = { ...item, id: item.id || Date.now().toString() };
+  const newItem = { ...item, id: item.id || Date.now().toString() + Math.random().toString(36).substring(2) };
   schedule.push(newItem);
   saveLocalSchedule(schedule);
   queueOperation('addScheduleItem', newItem);
@@ -159,7 +183,7 @@ export function deleteScheduleItem(id: string) {
 }
 
 export function resetSchedule(defaultItems: any[]) {
-  const itemsWithIds = defaultItems.map(item => ({ ...item, id: item.id || Date.now().toString() + Math.random().toString() }));
+  const itemsWithIds = defaultItems.map(item => ({ ...item, id: item.id || Date.now().toString() + Math.random().toString(36).substring(2) }));
   saveLocalSchedule(itemsWithIds);
   queueOperation('resetSchedule', { items: itemsWithIds });
   if (navigator.onLine) syncQueue();

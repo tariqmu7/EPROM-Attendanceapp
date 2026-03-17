@@ -3,6 +3,7 @@ import { getLocalSchedule, addScheduleItem, updateScheduleItem, deleteScheduleIt
 import { motion, AnimatePresence } from 'motion/react';
 import { Calendar, Clock, User, BookOpen, Edit2, Save, X, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'react-toastify';
+import ConfirmModal from './ConfirmModal';
 
 export interface ScheduleItem {
   id?: string;
@@ -23,6 +24,18 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
   const [activeDay, setActiveDay] = useState(1);
   const [editingItem, setEditingItem] = useState<ScheduleItem | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [confirmState, setConfirmState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDestructive?: boolean;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
 
   useEffect(() => {
     const loadSchedule = () => {
@@ -114,59 +127,81 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
   };
 
   const handleDelete = (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this session?')) return;
-    try {
-      deleteScheduleItem(id);
-      toast.success(navigator.onLine ? 'Session deleted' : 'Session deleted locally');
-    } catch (error) {
-      toast.error('Failed to delete session');
-    }
+    setConfirmState({
+      isOpen: true,
+      title: 'Delete Session',
+      message: 'Are you sure you want to delete this session? This action cannot be undone.',
+      isDestructive: true,
+      onConfirm: () => {
+        try {
+          deleteScheduleItem(id);
+          toast.success(navigator.onLine ? 'Session deleted' : 'Session deleted locally');
+        } catch (error) {
+          toast.error('Failed to delete session');
+        }
+      }
+    });
   };
 
   const handleReset = () => {
-    if (!window.confirm('This will delete all current sessions and reset to the default spread. Continue?')) return;
-    try {
-      const defaultItems: ScheduleItem[] = [];
-      const subjects = ["Digital Transformation", "Asset Integrity", "Operational Excellence", "Predictive Maintenance", "Safety First"];
-      
-      for (let day = 1; day <= 3; day++) {
-        const startHour = day === 1 ? 14 : 10;
-        const endHour = 19;
-        const totalAvailableMins = (endHour - startHour) * 60;
-        const sessionDuration = 20;
-        const totalSessionTime = 5 * sessionDuration;
-        const totalGapTime = totalAvailableMins - totalSessionTime;
-        const gapPerSession = Math.floor(totalGapTime / 4);
+    setConfirmState({
+      isOpen: true,
+      title: 'Reset Schedule',
+      message: 'This will delete all current sessions and reset to the default spread. Continue?',
+      isDestructive: true,
+      onConfirm: () => {
+        try {
+          const defaultItems: ScheduleItem[] = [];
+          const subjects = ["Digital Transformation", "Asset Integrity", "Operational Excellence", "Predictive Maintenance", "Safety First"];
+          
+          for (let day = 1; day <= 3; day++) {
+            const startHour = day === 1 ? 14 : 10;
+            const endHour = 19;
+            const totalAvailableMins = (endHour - startHour) * 60;
+            const sessionDuration = 20;
+            const totalSessionTime = 5 * sessionDuration;
+            const totalGapTime = totalAvailableMins - totalSessionTime;
+            const gapPerSession = Math.floor(totalGapTime / 4);
 
-        for (let i = 0; i < 5; i++) {
-          const currentMins = (startHour * 60) + (i * (sessionDuration + gapPerSession));
-          const sessionStartH = Math.floor(currentMins / 60);
-          const sessionStartM = currentMins % 60;
-          const sessionEndMins = currentMins + sessionDuration;
-          const sessionEndH = Math.floor(sessionEndMins / 60);
-          const sessionEndM = sessionEndMins % 60;
+            for (let i = 0; i < 5; i++) {
+              const currentMins = (startHour * 60) + (i * (sessionDuration + gapPerSession));
+              const sessionStartH = Math.floor(currentMins / 60);
+              const sessionStartM = currentMins % 60;
+              const sessionEndMins = currentMins + sessionDuration;
+              const sessionEndH = Math.floor(sessionEndMins / 60);
+              const sessionEndM = sessionEndMins % 60;
 
-          defaultItems.push({
-            day,
-            startTime: `${sessionStartH.toString().padStart(2, '0')}:${sessionStartM.toString().padStart(2, '0')}`,
-            endTime: `${sessionEndH.toString().padStart(2, '0')}:${sessionEndM.toString().padStart(2, '0')}`,
-            title: `EPROM Technical Session ${i + 1}`,
-            speaker: "EPROM Expert",
-            subject: subjects[i]
-          });
+              defaultItems.push({
+                day,
+                startTime: `${sessionStartH.toString().padStart(2, '0')}:${sessionStartM.toString().padStart(2, '0')}`,
+                endTime: `${sessionEndH.toString().padStart(2, '0')}:${sessionEndM.toString().padStart(2, '0')}`,
+                title: `EPROM Technical Session ${i + 1}`,
+                speaker: "EPROM Expert",
+                subject: subjects[i]
+              });
+            }
+          }
+          resetSchedule(defaultItems);
+          toast.success(navigator.onLine ? 'Schedule reset to default spread' : 'Schedule reset locally');
+        } catch (error) {
+          toast.error('Failed to reset schedule');
         }
       }
-      resetSchedule(defaultItems);
-      toast.success(navigator.onLine ? 'Schedule reset to default spread' : 'Schedule reset locally');
-    } catch (error) {
-      toast.error('Failed to reset schedule');
-    }
+    });
   };
 
   const filteredItems = items.filter(item => item.day === activeDay);
 
   return (
     <div className="max-w-4xl mx-auto">
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        title={confirmState.title}
+        message={confirmState.message}
+        onConfirm={confirmState.onConfirm}
+        onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
+        isDestructive={confirmState.isDestructive}
+      />
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <button 
@@ -219,9 +254,9 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
 
       <div className="space-y-4">
         <AnimatePresence mode="popLayout">
-          {filteredItems.map((item) => (
+          {filteredItems.map((item, index) => (
             <motion.div
-              key={item.id}
+              key={`${item.id}-${index}`}
               layout
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}

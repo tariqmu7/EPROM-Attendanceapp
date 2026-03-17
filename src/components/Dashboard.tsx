@@ -5,6 +5,7 @@ import { Download, Edit2, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AttendanceRecord } from '../App';
 import { toast } from 'react-toastify';
+import ConfirmModal from './ConfirmModal';
 
 interface DashboardProps {
   onEdit: (log: AttendanceRecord) => void;
@@ -12,6 +13,18 @@ interface DashboardProps {
 
 export default function Dashboard({ onEdit }: DashboardProps) {
   const [logs, setLogs] = useState<AttendanceRecord[]>([]);
+  const [confirmState, setConfirmState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDestructive?: boolean;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
 
   useEffect(() => {
     const loadLogs = () => {
@@ -45,21 +58,35 @@ export default function Dashboard({ onEdit }: DashboardProps) {
   };
 
   const handleDelete = (log: AttendanceRecord) => {
-    if (!window.confirm(`Are you sure you want to delete the log for ${log.name}?`)) return;
-
-    try {
-      if (log.id) {
-        deleteLog(log.id);
-        toast.success(navigator.onLine ? 'Log deleted successfully' : 'Log deleted locally. Will sync when online.');
+    setConfirmState({
+      isOpen: true,
+      title: 'Delete Log',
+      message: `Are you sure you want to delete the log for ${log.name}?`,
+      isDestructive: true,
+      onConfirm: () => {
+        try {
+          if (log.id) {
+            deleteLog(log.id);
+            toast.success(navigator.onLine ? 'Log deleted successfully' : 'Log deleted locally. Will sync when online.');
+          }
+        } catch (error) {
+          console.error("Error initiating delete:", error);
+          toast.error("Failed to initiate delete. Please try again.");
+        }
       }
-    } catch (error) {
-      console.error("Error initiating delete:", error);
-      toast.error("Failed to initiate delete. Please try again.");
-    }
+    });
   };
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        title={confirmState.title}
+        message={confirmState.message}
+        onConfirm={confirmState.onConfirm}
+        onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
+        isDestructive={confirmState.isDestructive}
+      />
       <div className="p-8 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 bg-slate-50/50">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-100">
@@ -111,7 +138,7 @@ export default function Dashboard({ onEdit }: DashboardProps) {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: -20, transition: { duration: 0.2 } }}
                     transition={{ delay: i * 0.05 }}
-                    key={log.id || i} 
+                    key={`${log.id}-${i}`} 
                     className="hover:bg-slate-50 transition-colors group"
                   >
                     <td className="p-6">
