@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { getLocalSchedule, addScheduleItem, updateScheduleItem, deleteScheduleItem, resetSchedule } from '../services/googleScript';
+import { getLocalSchedule, addScheduleItem, updateScheduleItem, deleteScheduleItem, resetSchedule, fetchAllData } from '../services/googleScript';
 import { motion, AnimatePresence } from 'motion/react';
-import { Calendar, Clock, User, BookOpen, Edit2, Save, X, Plus, Trash2 } from 'lucide-react';
+import { Calendar, Clock, User, BookOpen, Edit2, Save, X, Plus, Trash2, RefreshCw } from 'lucide-react';
 import { toast } from 'react-toastify';
 import ConfirmModal from './ConfirmModal';
 
@@ -21,6 +21,7 @@ interface ScheduleManagerProps {
 
 export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
   const [items, setItems] = useState<ScheduleItem[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeDay, setActiveDay] = useState(1);
   const [editingItem, setEditingItem] = useState<ScheduleItem | null>(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -40,12 +41,8 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
   useEffect(() => {
     const loadSchedule = () => {
       const scheduleData = getLocalSchedule();
-      scheduleData.sort((a, b) => a.startTime.localeCompare(b.startTime));
+      scheduleData.sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
       setItems(scheduleData);
-
-      if (scheduleData.length === 0) {
-        seedDefaultSchedule();
-      }
     };
 
     loadSchedule();
@@ -56,20 +53,18 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
     };
   }, []);
 
-  const seedDefaultSchedule = () => {
+  const getDefaultSchedule = () => {
     const defaultItems: ScheduleItem[] = [];
     const subjects = ["Digital Transformation", "Asset Integrity", "Operational Excellence", "Predictive Maintenance", "Safety First"];
     
     for (let day = 1; day <= 3; day++) {
-      // Day 1: 14:00 -> 19:00 (5 hours = 300 mins)
-      // Day 2/3: 10:00 -> 19:00 (9 hours = 540 mins)
       const startHour = day === 1 ? 14 : 10;
       const endHour = 19;
       const totalAvailableMins = (endHour - startHour) * 60;
       const sessionDuration = 20;
       const totalSessionTime = 5 * sessionDuration;
       const totalGapTime = totalAvailableMins - totalSessionTime;
-      const gapPerSession = Math.floor(totalGapTime / 4); // 4 gaps between 5 sessions
+      const gapPerSession = Math.floor(totalGapTime / 4);
 
       for (let i = 0; i < 5; i++) {
         const minutesFromStart = i * (sessionDuration + gapPerSession);
@@ -88,15 +83,33 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
           startTime: startStr,
           endTime: endStr,
           title: i === 0 ? `Keynote: ${subjects[i]}` : `Session ${i+1}: ${subjects[i]}`,
-          speaker: `Speaker ${day}-${i+1}`,
+          speaker: `EPROM Expert ${day}-${i+1}`,
           subject: subjects[i]
         });
       }
     }
+    return defaultItems;
+  };
 
-    for (const item of defaultItems) {
-      addScheduleItem(item);
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      const success = await fetchAllData();
+      if (success) {
+        toast.success("Schedule updated from Google Sheet");
+      } else {
+        toast.error("Failed to fetch schedule. Check your connection.");
+      }
+    } catch (error) {
+      toast.error("Error syncing schedule");
+    } finally {
+      setIsRefreshing(false);
     }
+  };
+
+  const seedDefaultSchedule = () => {
+    const defaultItems = getDefaultSchedule();
+    resetSchedule(defaultItems);
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -151,36 +164,7 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
       isDestructive: true,
       onConfirm: () => {
         try {
-          const defaultItems: ScheduleItem[] = [];
-          const subjects = ["Digital Transformation", "Asset Integrity", "Operational Excellence", "Predictive Maintenance", "Safety First"];
-          
-          for (let day = 1; day <= 3; day++) {
-            const startHour = day === 1 ? 14 : 10;
-            const endHour = 19;
-            const totalAvailableMins = (endHour - startHour) * 60;
-            const sessionDuration = 20;
-            const totalSessionTime = 5 * sessionDuration;
-            const totalGapTime = totalAvailableMins - totalSessionTime;
-            const gapPerSession = Math.floor(totalGapTime / 4);
-
-            for (let i = 0; i < 5; i++) {
-              const currentMins = (startHour * 60) + (i * (sessionDuration + gapPerSession));
-              const sessionStartH = Math.floor(currentMins / 60);
-              const sessionStartM = currentMins % 60;
-              const sessionEndMins = currentMins + sessionDuration;
-              const sessionEndH = Math.floor(sessionEndMins / 60);
-              const sessionEndM = sessionEndMins % 60;
-
-              defaultItems.push({
-                day,
-                startTime: `${sessionStartH.toString().padStart(2, '0')}:${sessionStartM.toString().padStart(2, '0')}`,
-                endTime: `${sessionEndH.toString().padStart(2, '0')}:${sessionEndM.toString().padStart(2, '0')}`,
-                title: `EPROM Technical Session ${i + 1}`,
-                speaker: "EPROM Expert",
-                subject: subjects[i]
-              });
-            }
-          }
+          const defaultItems = getDefaultSchedule();
           resetSchedule(defaultItems);
           toast.success(navigator.onLine ? 'Schedule reset to default spread' : 'Schedule reset locally');
         } catch (error) {
@@ -216,6 +200,15 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
           </div>
         </div>
         <div className="flex gap-3">
+          <button 
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className={`flex items-center gap-2 px-6 py-3 border-2 border-indigo-100 text-indigo-600 rounded-xl font-bold hover:bg-indigo-50 transition-all active:scale-95 ${isRefreshing ? 'opacity-50' : ''}`}
+            title="Refresh from Google Sheet"
+          >
+            <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
           <button 
             onClick={handleReset}
             className="flex items-center gap-2 px-6 py-3 border-2 border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-all active:scale-95"
@@ -306,7 +299,15 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
         {filteredItems.length === 0 && (
           <div className="text-center py-20 bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-200">
             <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-            <p className="text-slate-500 font-medium">No sessions scheduled for Day {activeDay}</p>
+            <p className="text-slate-500 font-medium mb-2">No sessions scheduled for Day {activeDay}</p>
+            {items.length === 0 && (
+              <button 
+                onClick={seedDefaultSchedule}
+                className="mt-4 px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95"
+              >
+                Generate Default Schedule
+              </button>
+            )}
           </div>
         )}
       </div>

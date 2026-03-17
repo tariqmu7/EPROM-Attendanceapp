@@ -4,7 +4,7 @@ import { analyzeBusinessCard, ExtractedData } from '../services/gemini';
 import { motion } from 'motion/react';
 
 interface CardScannerProps {
-  onExtracted: (data: ExtractedData) => void;
+  onExtracted: (data: ExtractedData, image?: { base64: string; mimeType: string }) => void;
   onCancel: () => void;
 }
 
@@ -58,7 +58,7 @@ export default function CardScanner({ onExtracted, onCancel }: CardScannerProps)
         
         try {
           const extracted = await analyzeBusinessCard(base64String, 'image/jpeg');
-          onExtracted(extracted);
+          onExtracted(extracted, { base64: base64String, mimeType: 'image/jpeg' });
         } catch (err) {
           setError("Failed to analyze image. Please try again.");
           console.error(err);

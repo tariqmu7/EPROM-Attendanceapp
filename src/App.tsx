@@ -31,6 +31,7 @@ type AppState = 'dashboard' | 'voice' | 'scan' | 'review' | 'manual' | 'schedule
 export default function App() {
   const [appState, setAppState] = useState<AppState>('dashboard');
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
+  const [cardImage, setCardImage] = useState<{ base64: string; mimeType: string } | null>(null);
   const [editingLog, setEditingLog] = useState<AttendanceRecord | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [unsyncedCount, setUnsyncedCount] = useState(0);
@@ -78,8 +79,9 @@ export default function App() {
     };
   }, []);
 
-  const handleExtracted = (data: ExtractedData) => {
+  const handleExtracted = (data: ExtractedData, image?: { base64: string; mimeType: string }) => {
     setExtractedData(data);
+    if (image) setCardImage(image);
     setEditingLog(null);
     setAppState('review');
   };
@@ -97,10 +99,12 @@ export default function App() {
   };
 
   const handleSave = async (data: ExtractedData) => {
-    const logData = {
+    const logData: AttendanceRecord = {
       ...data,
       timestamp: editingLog ? editingLog.timestamp : Date.now(),
       authorUid: 'local-user',
+      cardImageBase64: cardImage?.base64,
+      cardImageMimeType: cardImage?.mimeType,
     };
 
     try {
@@ -114,6 +118,7 @@ export default function App() {
       
       setAppState('dashboard');
       setExtractedData(null);
+      setCardImage(null);
       setEditingLog(null);
     } catch (error) {
       console.error("Error initiating save:", error);
@@ -152,18 +157,31 @@ export default function App() {
             <div className="flex items-center gap-3">
               <motion.div 
                 layout
-                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-full flex items-center gap-1.5 sm:gap-2 font-medium text-xs sm:text-sm border ${
+                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-full flex items-center gap-1.5 sm:gap-2 font-medium text-xs sm:text-sm border transition-all ${
                   unsyncedCount > 0 
-                    ? 'bg-amber-100/90 text-amber-800 border-amber-200' 
+                    ? 'bg-amber-100/90 text-amber-800 border-amber-200 cursor-pointer hover:bg-amber-200' 
                     : 'bg-slate-50/90 text-slate-600 border-slate-200'
                 }`}
+                onClick={() => {
+                  if (unsyncedCount > 0 && isOnline) {
+                    syncQueue().then(count => {
+                      if (count > 0) {
+                        toast.success(`Synced ${count} items`);
+                      } else if (unsyncedCount > 0) {
+                        toast.error("Sync failed. Check your connection and Script URL.");
+                      }
+                    });
+                  }
+                }}
               >
                 {unsyncedCount > 0 ? (
                   <Clock className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" />
                 ) : (
                   <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
                 )}
-                <span className="hidden lg:inline">{unsyncedCount} pending sync</span>
+                <span className="hidden lg:inline">
+                  {unsyncedCount > 0 ? `Sync ${unsyncedCount} items` : 'All synced'}
+                </span>
                 <span className="lg:hidden">{unsyncedCount}</span>
               </motion.div>
               <motion.div 

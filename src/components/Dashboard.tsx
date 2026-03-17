@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { getLocalLogs, deleteLog } from '../services/googleScript';
+import { getLocalLogs, deleteLog, fetchAllData, SCRIPT_URL, initializeSheet } from '../services/googleScript';
 import * as XLSX from 'xlsx';
-import { Download, Edit2, Trash2 } from 'lucide-react';
+import { Download, Edit2, Trash2, RefreshCw, AlertCircle, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AttendanceRecord } from '../App';
 import { toast } from 'react-toastify';
@@ -13,6 +13,8 @@ interface DashboardProps {
 
 export default function Dashboard({ onEdit }: DashboardProps) {
   const [logs, setLogs] = useState<AttendanceRecord[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const isUrlConfigured = SCRIPT_URL && !SCRIPT_URL.includes('YOUR_SCRIPT_ID');
   const [confirmState, setConfirmState] = useState<{
     isOpen: boolean;
     title: string;
@@ -39,6 +41,48 @@ export default function Dashboard({ onEdit }: DashboardProps) {
       window.removeEventListener('localDataChanged', loadLogs);
     };
   }, []);
+
+  const handleRefresh = async () => {
+    if (!isUrlConfigured) {
+      toast.warning("Google Script URL is not configured. Sync is disabled.");
+      return;
+    }
+    
+    setIsRefreshing(true);
+    try {
+      const success = await fetchAllData();
+      if (success) {
+        toast.success("Data refreshed from Google Sheet");
+      } else {
+        toast.error("Failed to refresh data. Check your Script URL and deployment.");
+      }
+    } catch (error) {
+      toast.error("An error occurred while refreshing data.");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleSetupSheet = async () => {
+    if (!isUrlConfigured) return;
+    
+    const confirmed = window.confirm("This will add header rows to your Google Sheet if they don't exist. Continue?");
+    if (!confirmed) return;
+
+    setIsRefreshing(true);
+    try {
+      const success = await initializeSheet();
+      if (success) {
+        toast.success("Sheet headers initialized successfully");
+      } else {
+        toast.error("Failed to setup headers. Check your Script deployment.");
+      }
+    } catch (error) {
+      toast.error("An error occurred during setup.");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const exportToExcel = async () => {
     const worksheetData = logs.map(log => ({
@@ -97,13 +141,39 @@ export default function Dashboard({ onEdit }: DashboardProps) {
             <p className="text-sm text-slate-500 mt-0.5">Real-time attendance monitoring</p>
           </div>
         </div>
-        <button 
-          onClick={exportToExcel}
-          className="flex items-center gap-2 px-6 py-3 bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50 rounded-xl font-bold transition-all shadow-sm hover:shadow-md active:scale-95"
-        >
-          <Download className="w-5 h-5" />
-          Export to Excel
-        </button>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {!isUrlConfigured && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-xs font-medium">
+              <AlertCircle className="w-4 h-4" />
+              Sync Disabled: URL not set
+            </div>
+          )}
+          <button 
+            onClick={handleSetupSheet}
+            disabled={isRefreshing}
+            className={`flex items-center justify-center gap-2 px-6 py-3 bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 rounded-xl font-bold transition-all shadow-sm hover:shadow-md active:scale-95 ${isRefreshing ? 'opacity-50' : ''}`}
+            title="Setup Sheet Headers"
+          >
+            <Settings className="w-5 h-5" />
+            <span className="sm:hidden lg:inline">Setup Sheet</span>
+          </button>
+          <button 
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className={`flex items-center justify-center gap-2 px-6 py-3 bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-50 rounded-xl font-bold transition-all shadow-sm hover:shadow-md active:scale-95 ${isRefreshing ? 'opacity-50 cursor-not-allowed' : ''}`}
+            title="Refresh from Google Sheet"
+          >
+            <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span className="sm:hidden lg:inline">Refresh</span>
+          </button>
+          <button 
+            onClick={exportToExcel}
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50 rounded-xl font-bold transition-all shadow-sm hover:shadow-md active:scale-95"
+          >
+            <Download className="w-5 h-5" />
+            <span className="sm:hidden lg:inline">Export</span>
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
