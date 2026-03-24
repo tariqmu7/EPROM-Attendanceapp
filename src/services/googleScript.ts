@@ -39,6 +39,8 @@ export async function fetchFromScript(action: string, payload?: any): Promise<Sc
     const data = await response.json();
     if (!data.success) {
       console.error(`Script returned failure for action ${action}:`, data.error);
+    } else {
+      console.log(`Action ${action} success:`, data.data);
     }
     return data;
   } catch (error) {
@@ -184,7 +186,7 @@ export async function syncQueue() {
 export async function initializeSheet() {
   if (!SCRIPT_URL || SCRIPT_URL.includes('YOUR_SCRIPT_ID')) return;
   
-  const logHeaders = ['ID', 'Name', 'Phone', 'Company', 'Title', 'Reason', 'Timestamp', 'Author UID'];
+  const logHeaders = ['ID', 'Name', 'Phone', 'Company', 'Title', 'Reason', 'Timestamp', 'Author UID', 'Card Image URL'];
   const scheduleHeaders = ['ID', 'Day', 'Start Time', 'End Time', 'Title', 'Speaker', 'Subject', 'Category'];
   
   try {
@@ -251,6 +253,7 @@ export async function fetchAllData() {
         // Robust mapping in case data comes as arrays (rows) instead of objects
         const mappedSchedule = scheduleData.map((item: any) => {
           if (Array.isArray(item)) {
+            const categoryValue = item[7] ? String(item[7]).toLowerCase().trim() : '';
             return {
               id: item[0] || generateId(),
               day: Number(item[1]) || 1,
@@ -259,14 +262,15 @@ export async function fetchAllData() {
               title: String(item[4] || ''),
               speaker: String(item[5] || ''),
               subject: String(item[6] || ''),
-              category: String(item[7] || 'activity')
+              category: (categoryValue === 'closing' || categoryValue === 'activity') ? (categoryValue as 'activity' | 'closing') : 'activity'
             };
           }
+          const categoryValue = item.category ? String(item.category).toLowerCase().trim() : 'activity';
           return {
             ...item,
             startTime: formatTime(item.startTime),
             endTime: formatTime(item.endTime),
-            category: item.category || 'activity'
+            category: (categoryValue === 'closing' || categoryValue === 'activity') ? (categoryValue as 'activity' | 'closing') : 'activity'
           };
         });
         saveLocalSchedule(mappedSchedule);
