@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getLocalSchedule, addScheduleItem, updateScheduleItem, deleteScheduleItem, resetSchedule, fetchAllData } from '../services/googleScript';
 import { motion, AnimatePresence } from 'motion/react';
-import { Calendar, Clock, User, BookOpen, Edit2, Save, X, Plus, Trash2, RefreshCw } from 'lucide-react';
+import { Calendar, Clock, User, BookOpen, Edit2, Save, X, Plus, Trash2, RefreshCw, Handshake } from 'lucide-react';
 import { toast } from 'react-toastify';
 import ConfirmModal from './ConfirmModal';
 
@@ -13,6 +13,7 @@ export interface ScheduleItem {
   title: string;
   speaker: string;
   subject: string;
+  category?: 'activity' | 'closing';
 }
 
 interface ScheduleManagerProps {
@@ -22,6 +23,7 @@ interface ScheduleManagerProps {
 export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
   const [items, setItems] = useState<ScheduleItem[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<'activity' | 'closing'>('activity');
   const [activeDay, setActiveDay] = useState(1);
   const [editingItem, setEditingItem] = useState<ScheduleItem | null>(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -84,7 +86,8 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
           endTime: endStr,
           title: i === 0 ? `Keynote: ${subjects[i]}` : `Session ${i+1}: ${subjects[i]}`,
           speaker: `EPROM Expert ${day}-${i+1}`,
-          subject: subjects[i]
+          subject: subjects[i],
+          category: 'activity'
         });
       }
     }
@@ -174,7 +177,7 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
     });
   };
 
-  const filteredItems = items.filter(item => item.day === activeDay);
+  const filteredItems = items.filter(item => item.day === activeDay && (item.category || 'activity') === activeCategory);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -218,31 +221,66 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
           </button>
           <button 
             onClick={() => {
-              setEditingItem({ day: activeDay, startTime: activeDay === 1 ? '14:00' : '10:00', endTime: activeDay === 1 ? '14:20' : '10:20', title: '', speaker: '', subject: '' });
+              setEditingItem({ 
+                day: activeDay, 
+                startTime: activeDay === 1 ? '14:00' : '10:00', 
+                endTime: activeDay === 1 ? '14:20' : '10:20', 
+                title: '', 
+                speaker: '', 
+                subject: '',
+                category: activeCategory
+              });
               setIsAdding(true);
             }}
             className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-all active:scale-95"
           >
             <Plus className="w-5 h-5" />
-            Add Session
+            {activeCategory === 'activity' ? 'Add Session' : 'Add Meeting'}
           </button>
         </div>
       </div>
 
-      <div className="flex gap-2 mb-8 bg-slate-100 p-1.5 rounded-2xl w-fit">
-        {[1, 2, 3].map(day => (
+      <div className="flex flex-col sm:flex-row gap-6 mb-8 items-start sm:items-center justify-between">
+        <div className="flex bg-slate-100 p-1.5 rounded-2xl w-fit">
           <button
-            key={day}
-            onClick={() => setActiveDay(day)}
-            className={`px-8 py-3 rounded-xl font-bold transition-all ${
-              activeDay === day 
+            onClick={() => setActiveCategory('activity')}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all ${
+              activeCategory === 'activity' 
                 ? 'bg-white text-indigo-600 shadow-sm' 
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            Day {day}
+            <Calendar className="w-5 h-5" />
+            Activities
           </button>
-        ))}
+          <button
+            onClick={() => setActiveCategory('closing')}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all ${
+              activeCategory === 'closing' 
+                ? 'bg-white text-emerald-600 shadow-sm' 
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Handshake className="w-5 h-5" />
+            Closing Meetings
+          </button>
+        </div>
+
+        <div className="flex gap-2 bg-slate-100 p-1.5 rounded-2xl w-fit">
+          {[1, 2, 3].map(day => (
+            <button
+              key={day}
+              onClick={() => setActiveDay(day)}
+              className={`px-6 py-2.5 rounded-xl font-bold transition-all ${
+                activeDay === day 
+                  ? 'bg-white text-slate-800 shadow-sm' 
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Day {day}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -258,7 +296,9 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                 <div className="flex items-start gap-6">
-                  <div className="flex flex-col items-center justify-center bg-indigo-50 text-indigo-600 p-4 rounded-2xl min-w-[100px]">
+                  <div className={`flex flex-col items-center justify-center p-4 rounded-2xl min-w-[100px] ${
+                    item.category === 'closing' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'
+                  }`}>
                     <Clock className="w-5 h-5 mb-1" />
                     <span className="text-lg font-black">{item.startTime}</span>
                     <span className="text-xs font-bold opacity-60">to {item.endTime}</span>
@@ -267,11 +307,11 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
                     <h3 className="text-xl font-bold text-slate-800 mb-2">{item.title}</h3>
                     <div className="flex flex-wrap gap-4 text-sm font-medium">
                       <div className="flex items-center gap-1.5 text-slate-600">
-                        <User className="w-4 h-4 text-indigo-500" />
+                        <User className={`w-4 h-4 ${item.category === 'closing' ? 'text-emerald-500' : 'text-indigo-500'}`} />
                         {item.speaker}
                       </div>
                       <div className="flex items-center gap-1.5 text-slate-600">
-                        <BookOpen className="w-4 h-4 text-emerald-500" />
+                        <BookOpen className={`w-4 h-4 ${item.category === 'closing' ? 'text-teal-500' : 'text-emerald-500'}`} />
                         {item.subject}
                       </div>
                     </div>
@@ -298,9 +338,15 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
 
         {filteredItems.length === 0 && (
           <div className="text-center py-20 bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-200">
-            <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-            <p className="text-slate-500 font-medium mb-2">No sessions scheduled for Day {activeDay}</p>
-            {items.length === 0 && (
+            {activeCategory === 'closing' ? (
+              <Handshake className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+            ) : (
+              <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+            )}
+            <p className="text-slate-500 font-medium mb-2">
+              No {activeCategory === 'closing' ? 'closing meetings' : 'sessions'} scheduled for Day {activeDay}
+            </p>
+            {items.length === 0 && activeCategory === 'activity' && (
               <button 
                 onClick={seedDefaultSchedule}
                 className="mt-4 px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95"
@@ -324,7 +370,9 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
             >
               <div className="p-8 border-b border-slate-100 flex justify-between items-center">
                 <h3 className="text-2xl font-black text-slate-800">
-                  {isAdding ? 'Add Session' : 'Edit Session'}
+                  {isAdding 
+                    ? (activeCategory === 'activity' ? 'Add Session' : 'Add Meeting') 
+                    : (activeCategory === 'activity' ? 'Edit Session' : 'Edit Meeting')}
                 </h3>
                 <button onClick={() => { setEditingItem(null); setIsAdding(false); }} className="p-2 hover:bg-slate-100 rounded-full">
                   <X className="w-6 h-6 text-slate-400" />
@@ -354,33 +402,39 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Session Title</label>
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">
+                    {activeCategory === 'activity' ? 'Session Title' : 'Meeting Title / Contract'}
+                  </label>
                   <input 
                     type="text" 
                     required
-                    placeholder="e.g. Future of Maintenance"
+                    placeholder={activeCategory === 'activity' ? "e.g. Future of Maintenance" : "e.g. Contract Signing - ABC Corp"}
                     value={editingItem.title}
                     onChange={e => setEditingItem({...editingItem, title: e.target.value})}
                     className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Speaker Name</label>
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">
+                    {activeCategory === 'activity' ? 'Speaker Name' : 'Client / Company'}
+                  </label>
                   <input 
                     type="text" 
                     required
-                    placeholder="John Doe"
+                    placeholder={activeCategory === 'activity' ? "John Doe" : "XYZ Industries"}
                     value={editingItem.speaker}
                     onChange={e => setEditingItem({...editingItem, speaker: e.target.value})}
                     className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Subject</label>
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">
+                    {activeCategory === 'activity' ? 'Subject' : 'Contract Details / Notes'}
+                  </label>
                   <input 
                     type="text" 
                     required
-                    placeholder="e.g. Digital Transformation"
+                    placeholder={activeCategory === 'activity' ? "e.g. Digital Transformation" : "e.g. Annual Maintenance Agreement"}
                     value={editingItem.subject}
                     onChange={e => setEditingItem({...editingItem, subject: e.target.value})}
                     className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold"
@@ -389,10 +443,16 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
                 <div className="pt-4">
                   <button 
                     type="submit"
-                    className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-3"
+                    className={`w-full py-5 text-white rounded-2xl font-black text-lg shadow-xl transition-all flex items-center justify-center gap-3 ${
+                      activeCategory === 'closing' 
+                        ? 'bg-emerald-600 shadow-emerald-100 hover:bg-emerald-700' 
+                        : 'bg-indigo-600 shadow-indigo-100 hover:bg-indigo-700'
+                    }`}
                   >
                     <Save className="w-6 h-6" />
-                    {isAdding ? 'Create Session' : 'Save Changes'}
+                    {isAdding 
+                      ? (activeCategory === 'activity' ? 'Create Session' : 'Create Meeting') 
+                      : 'Save Changes'}
                   </button>
                 </div>
               </form>

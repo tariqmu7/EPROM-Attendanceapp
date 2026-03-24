@@ -185,7 +185,7 @@ export async function initializeSheet() {
   if (!SCRIPT_URL || SCRIPT_URL.includes('YOUR_SCRIPT_ID')) return;
   
   const logHeaders = ['ID', 'Name', 'Phone', 'Company', 'Title', 'Reason', 'Timestamp', 'Author UID'];
-  const scheduleHeaders = ['ID', 'Day', 'Start Time', 'End Time', 'Title', 'Speaker', 'Subject'];
+  const scheduleHeaders = ['ID', 'Day', 'Start Time', 'End Time', 'Title', 'Speaker', 'Subject', 'Category'];
   
   try {
     const res = await fetchFromScript('setupHeaders', { logHeaders, scheduleHeaders });
@@ -258,13 +258,15 @@ export async function fetchAllData() {
               endTime: formatTime(item[3]),
               title: String(item[4] || ''),
               speaker: String(item[5] || ''),
-              subject: String(item[6] || '')
+              subject: String(item[6] || ''),
+              category: String(item[7] || 'activity')
             };
           }
           return {
             ...item,
             startTime: formatTime(item.startTime),
-            endTime: formatTime(item.endTime)
+            endTime: formatTime(item.endTime),
+            category: item.category || 'activity'
           };
         });
         saveLocalSchedule(mappedSchedule);
