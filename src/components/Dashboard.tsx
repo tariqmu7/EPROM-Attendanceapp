@@ -237,7 +237,7 @@ export default function Dashboard({ onEdit }: DashboardProps) {
                       "{log.reason || '-'}"
                     </td>
                     <td className="p-6 text-base text-slate-500 whitespace-nowrap">
-                      <div className="font-medium text-slate-700">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                      <div className="font-medium text-slate-700">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}</div>
                       <div className="text-sm text-slate-400">{new Date(log.timestamp).toLocaleDateString()}</div>
                     </td>
                     <td className="p-6 text-right">

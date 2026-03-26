@@ -5,6 +5,16 @@ import { Calendar, Clock, User, BookOpen, Edit2, Save, X, Plus, Trash2, RefreshC
 import { toast } from 'react-toastify';
 import ConfirmModal from './ConfirmModal';
 
+export const format12Hour = (time24: string) => {
+  if (!time24) return '';
+  const [hours, minutes] = time24.split(':');
+  if (!hours || !minutes) return time24;
+  const h = parseInt(hours, 10);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${minutes} ${ampm}`;
+};
+
 export interface ScheduleItem {
   id?: string;
   day: number;
@@ -300,8 +310,8 @@ export default function ScheduleManager({ onBack }: ScheduleManagerProps) {
                     item.category === 'closing' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'
                   }`}>
                     <Clock className="w-5 h-5 mb-1" />
-                    <span className="text-lg font-black">{item.startTime}</span>
-                    <span className="text-xs font-bold opacity-60">to {item.endTime}</span>
+                    <span className="text-lg font-black whitespace-nowrap">{format12Hour(item.startTime)}</span>
+                    <span className="text-xs font-bold opacity-60 whitespace-nowrap">to {format12Hour(item.endTime)}</span>
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-slate-800 mb-2">{item.title}</h3>
