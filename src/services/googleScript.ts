@@ -208,23 +208,69 @@ export async function fetchAllData() {
       
       if (res.data.logs && Array.isArray(res.data.logs)) {
         // Skip header row if it exists
-        const logsData = res.data.logs[0] && res.data.logs[0][0] === 'ID' ? res.data.logs.slice(1) : res.data.logs;
+        const firstRow = res.data.logs[0];
+        const isHeader = firstRow && Array.isArray(firstRow) && 
+          (String(firstRow[0]).toLowerCase() === 'id' || String(firstRow[1]).toLowerCase() === 'name');
+        const logsData = isHeader ? res.data.logs.slice(1) : res.data.logs;
         
         const mappedLogs = logsData.map((item: any) => {
           if (Array.isArray(item)) {
+            let phone = String(item[2] || '');
+            if (phone.startsWith("'")) {
+              phone = phone.substring(1);
+            }
+            let ts = Number(item[6]);
+            if (isNaN(ts)) ts = new Date(item[6]).getTime();
+            if (isNaN(ts)) ts = Date.now();
+            
             return {
               id: item[0] || generateId(),
               name: String(item[1] || ''),
-              phone: String(item[2] || ''),
+              phone: phone,
               company: String(item[3] || ''),
               title: String(item[4] || ''),
               reason: String(item[5] || ''),
-              timestamp: Number(item[6]) || Date.now(),
+              timestamp: ts,
               authorUid: String(item[7] || 'local-user'),
+              cardImageUrl: String(item[8] || ''),
               synced: 1
             };
           }
-          return item;
+          
+          // Helper to get value case-insensitively and ignoring spaces
+          const getVal = (key: string) => {
+            if (item[key] !== undefined) return item[key];
+            
+            const targetKey = key.toLowerCase().replace(/\s/g, '');
+            for (const k in item) {
+              if (k.toLowerCase().replace(/\s/g, '') === targetKey) {
+                return item[k];
+              }
+            }
+            return '';
+          };
+
+          let phone = String(getVal('phone'));
+          if (phone.startsWith("'")) {
+            phone = phone.substring(1);
+          }
+          
+          let tsVal = getVal('timestamp');
+          let ts = typeof tsVal === 'number' ? tsVal : new Date(tsVal).getTime();
+          if (isNaN(ts)) ts = Date.now();
+
+          return { 
+            id: getVal('id') || generateId(),
+            name: String(getVal('name')),
+            phone: phone,
+            company: String(getVal('company')),
+            title: String(getVal('title')),
+            reason: String(getVal('reason')),
+            timestamp: ts,
+            authorUid: String(getVal('authorUid') || 'local-user'),
+            cardImageUrl: String(getVal('cardImageUrl') || getVal('Card Image URL') || getVal('column9') || ''),
+            synced: 1
+          };
         });
         saveLocalLogs(mappedLogs);
       }
@@ -265,11 +311,27 @@ export async function fetchAllData() {
               category: (categoryValue === 'closing' || categoryValue === 'activity') ? (categoryValue as 'activity' | 'closing') : 'activity'
             };
           }
-          const categoryValue = item.category ? String(item.category).toLowerCase().trim() : 'activity';
+          
+          const getVal = (key: string) => {
+            if (item[key] !== undefined) return item[key];
+            const targetKey = key.toLowerCase().replace(/\s/g, '');
+            for (const k in item) {
+              if (k.toLowerCase().replace(/\s/g, '') === targetKey) {
+                return item[k];
+              }
+            }
+            return '';
+          };
+
+          const categoryValue = getVal('category') ? String(getVal('category')).toLowerCase().trim() : 'activity';
           return {
-            ...item,
-            startTime: formatTime(item.startTime),
-            endTime: formatTime(item.endTime),
+            id: getVal('id') || generateId(),
+            day: Number(getVal('day')) || 1,
+            startTime: formatTime(getVal('startTime')),
+            endTime: formatTime(getVal('endTime')),
+            title: String(getVal('title')),
+            speaker: String(getVal('speaker')),
+            subject: String(getVal('subject')),
             category: (categoryValue === 'closing' || categoryValue === 'activity') ? (categoryValue as 'activity' | 'closing') : 'activity'
           };
         });
@@ -282,6 +344,14 @@ export async function fetchAllData() {
     console.error("Failed to fetch all data", error);
     return false;
   }
+}
+
+export async function fetchImageBase64FromDrive(url: string) {
+  const res = await fetchFromScript('fetchImageBase64', { url });
+  if (res.success && res.data) {
+    return res.data as { base64: string, mimeType: string };
+  }
+  throw new Error(res.error || "Failed to fetch image");
 }
 
 export function addLog(log: any) {
@@ -297,7 +367,11 @@ export function addLog(log: any) {
   saveLocalLogs(logs);
   
   // Queue the full log including the image for syncing to the backend
-  queueOperation('addLog', newLog);
+  const payloadLog = { ...newLog };
+  if (payloadLog.phone && typeof payloadLog.phone === 'string' && !payloadLog.phone.startsWith("'")) {
+    payloadLog.phone = "'" + payloadLog.phone;
+  }
+  queueOperation('addLog', payloadLog);
   if (navigator.onLine) syncQueue();
 }
 
@@ -307,7 +381,12 @@ export function updateLog(id: string, log: any) {
   if (index !== -1) {
     logs[index] = { ...logs[index], ...log };
     saveLocalLogs(logs);
-    queueOperation('updateLog', { id, ...log });
+    
+    const payloadLog = { id, ...log };
+    if (payloadLog.phone && typeof payloadLog.phone === 'string' && !payloadLog.phone.startsWith("'")) {
+      payloadLog.phone = "'" + payloadLog.phone;
+    }
+    queueOperation('updateLog', payloadLog);
     if (navigator.onLine) syncQueue();
   }
 }

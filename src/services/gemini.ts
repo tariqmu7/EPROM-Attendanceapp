@@ -10,6 +10,7 @@ export interface ExtractedData {
   reason: string;
   cardImageBase64?: string;
   cardImageMimeType?: string;
+  cardImageUrl?: string;
 }
 
 const dataSchema = {

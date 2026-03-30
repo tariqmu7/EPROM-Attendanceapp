@@ -24,6 +24,7 @@ export interface AttendanceRecord {
   synced?: number;
   cardImageBase64?: string;
   cardImageMimeType?: string;
+  cardImageUrl?: string;
 }
 
 type AppState = 'dashboard' | 'voice' | 'scan' | 'review' | 'manual' | 'schedule';
@@ -88,12 +89,14 @@ export default function App() {
 
   const handleEdit = (log: AttendanceRecord) => {
     setEditingLog(log);
+    setCardImage(null);
     setExtractedData({
       name: log.name,
       phone: log.phone,
       company: log.company,
       title: log.title,
-      reason: log.reason
+      reason: log.reason,
+      cardImageUrl: log.cardImageUrl
     });
     setAppState('review');
   };
@@ -337,7 +340,16 @@ export default function App() {
               <ReviewForm 
                 initialData={extractedData} 
                 onSave={handleSave} 
-                onCancel={() => setAppState('dashboard')} 
+                onCancel={() => {
+                  setAppState('dashboard');
+                  setCardImage(null);
+                  setExtractedData(null);
+                }} 
+                onRetake={extractedData.cardImageBase64 ? () => {
+                  setAppState('scan');
+                  setCardImage(null);
+                  setExtractedData(null);
+                } : undefined}
                 isEdit={!!editingLog}
               />
             </motion.div>
